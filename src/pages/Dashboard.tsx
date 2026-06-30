@@ -1,41 +1,91 @@
-import { useNavigate } from 'react-router-dom'
+import { useEffect, useState } from 'react'
+import { Link as RouterLink } from 'react-router-dom'
 import { useAuth } from '@/context/AuthContext'
-import { Button } from '@/components/ui/button'
+import { listLinks, type Link } from '@/lib/api'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Button } from '@/components/ui/button'
+import { Alert, AlertDescription } from '@/components/ui/alert'
 
 export default function Dashboard() {
-  const { tier, subscriptionStatus, logout } = useAuth()
-  const navigate = useNavigate()
+  const { tier, subscriptionStatus } = useAuth()
+  const [links, setLinks] = useState<Link[]>([])
+  const [error, setError] = useState<string | null>(null)
+  const [isLoading, setIsLoading] = useState(true)
 
-  function handleLogout() {
-    logout()
-    navigate('/login')
-  }
+  useEffect(() => {
+    listLinks()
+      .then(setLinks)
+      .catch((err) => setError(err instanceof Error ? err.message : 'Failed to load links'))
+      .finally(() => setIsLoading(false))
+  }, [])
+
+  const totalLinks = links.length
+  const totalClicks = links.reduce((sum, l) => sum + l.clicks, 0)
+  const topLinks = [...links].sort((a, b) => b.clicks - a.clicks).slice(0, 5)
 
   return (
-    <div className="min-h-svh p-6">
-      <div className="mx-auto flex max-w-4xl flex-col gap-6">
-        <div className="flex items-center justify-between">
-          <h1 className="text-2xl font-semibold">Waytrace Dashboard</h1>
-          <Button variant="outline" onClick={handleLogout}>
-            Log out
-          </Button>
-        </div>
+    <div className="flex flex-col gap-6">
+      <div className="flex items-center justify-between">
+        <h1 className="text-2xl font-semibold">Dashboard</h1>
+        <Button render={<RouterLink to="/dashboard/links/new" />}>New link</Button>
+      </div>
+
+      {error && (
+        <Alert variant="destructive">
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
+      )}
+
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
         <Card>
           <CardHeader>
-            <CardTitle>Account</CardTitle>
-            <CardDescription>Your current plan and subscription status.</CardDescription>
+            <CardDescription>Total links</CardDescription>
+            <CardTitle className="text-3xl">{isLoading ? '—' : totalLinks}</CardTitle>
           </CardHeader>
-          <CardContent className="flex flex-col gap-1 text-sm">
-            <p>
-              <span className="font-medium">Tier:</span> {tier}
-            </p>
-            <p>
-              <span className="font-medium">Subscription:</span> {subscriptionStatus}
-            </p>
-          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader>
+            <CardDescription>Total clicks</CardDescription>
+            <CardTitle className="text-3xl">{isLoading ? '—' : totalClicks}</CardTitle>
+          </CardHeader>
+        </Card>
+        <Card>
+          <CardHeader>
+            <CardDescription>Plan</CardDescription>
+            <CardTitle className="text-3xl capitalize">{tier ?? '—'}</CardTitle>
+            <CardDescription className="capitalize">{subscriptionStatus}</CardDescription>
+          </CardHeader>
         </Card>
       </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Top links</CardTitle>
+          <CardDescription>Your best performing links by clicks.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          {!isLoading && topLinks.length === 0 ? (
+            <p className="text-sm text-muted-foreground">
+              No links yet.{' '}
+              <RouterLink to="/dashboard/links/new" className="underline">
+                Create your first link
+              </RouterLink>
+              .
+            </p>
+          ) : (
+            <ul className="flex flex-col gap-2">
+              {topLinks.map((link) => (
+                <li key={link.id} className="flex items-center justify-between border-b pb-2 text-sm last:border-0 last:pb-0">
+                  <RouterLink to={`/dashboard/links/${link.id}`} className="hover:underline">
+                    {link.label || link.short_code}
+                  </RouterLink>
+                  <span className="font-medium">{link.clicks} clicks</span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </CardContent>
+      </Card>
     </div>
   )
 }

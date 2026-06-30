@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, useCallback, type ReactNode } from 'react'
-import { loginAccount, registerAccount } from '@/lib/api'
+import { loginAccount, registerAccount, setPassword } from '@/lib/api'
 
 interface AuthState {
   apiToken: string | null
@@ -11,6 +11,7 @@ interface AuthContextValue extends AuthState {
   isAuthenticated: boolean
   login: (email: string, password: string) => Promise<void>
   register: (email: string, password: string, name?: string) => Promise<void>
+  completeSetup: (token: string, password: string) => Promise<void>
   logout: () => void
 }
 
@@ -54,6 +55,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     })
   }, [persist])
 
+  const completeSetup = useCallback(async (token: string, password: string) => {
+    const result = await setPassword(token, password)
+    persist({
+      apiToken: result.api_token,
+      tier: result.tier,
+      subscriptionStatus: result.subscription_status,
+    })
+  }, [persist])
+
   const logout = useCallback(() => {
     localStorage.removeItem(STORAGE_KEY)
     setAuth({ apiToken: null, tier: null, subscriptionStatus: null })
@@ -66,6 +76,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         isAuthenticated: Boolean(auth.apiToken),
         login,
         register,
+        completeSetup,
         logout,
       }}
     >
