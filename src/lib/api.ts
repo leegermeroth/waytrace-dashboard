@@ -72,6 +72,20 @@ export function setPassword(token: string, password: string) {
   })
 }
 
+export function forgotPassword(email: string) {
+  return request<{ message: string }>('/api/v1/auth/forgot-password', {
+    method: 'POST',
+    body: JSON.stringify({ email }),
+  })
+}
+
+export function resetPassword(token: string, password: string) {
+  return request<AuthResponse>('/api/v1/auth/reset-password', {
+    method: 'POST',
+    body: JSON.stringify({ token, password }),
+  })
+}
+
 export interface Client {
   id: number
   name: string

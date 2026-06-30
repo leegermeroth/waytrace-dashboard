@@ -1,17 +1,15 @@
 import { useState, type FormEvent } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
-import { useAuth } from '@/context/AuthContext'
+import { Link } from 'react-router-dom'
+import { forgotPassword } from '@/lib/api'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 
-export default function Login() {
-  const { login } = useAuth()
-  const navigate = useNavigate()
+export default function ForgotPassword() {
   const [email, setEmail] = useState('')
-  const [password, setPassword] = useState('')
+  const [submitted, setSubmitted] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
 
@@ -20,21 +18,47 @@ export default function Login() {
     setError(null)
     setIsSubmitting(true)
     try {
-      await login(email, password)
-      navigate('/dashboard')
+      await forgotPassword(email.trim().toLowerCase())
+      setSubmitted(true)
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Login failed')
+      setError(err instanceof Error ? err.message : 'Something went wrong')
     } finally {
       setIsSubmitting(false)
     }
+  }
+
+  if (submitted) {
+    return (
+      <div className="flex min-h-svh items-center justify-center p-4">
+        <Card className="w-full max-w-sm text-center">
+          <CardHeader>
+            <CardTitle>Check your email</CardTitle>
+            <CardDescription>
+              If <span className="font-medium text-foreground">{email}</span> is registered, a
+              password reset link is on its way. Check your spam folder if it doesn't arrive within
+              a few minutes.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <p className="text-center text-sm text-muted-foreground">
+              <Link to="/login" className="underline">
+                Back to log in
+              </Link>
+            </p>
+          </CardContent>
+        </Card>
+      </div>
+    )
   }
 
   return (
     <div className="flex min-h-svh items-center justify-center p-4">
       <Card className="w-full max-w-sm">
         <CardHeader>
-          <CardTitle>Log in to Waytrace</CardTitle>
-          <CardDescription>Enter your email and password to access your dashboard.</CardDescription>
+          <CardTitle>Forgot your password?</CardTitle>
+          <CardDescription>
+            Enter your email and we'll send you a reset link.
+          </CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="flex flex-col gap-4">
@@ -54,23 +78,12 @@ export default function Login() {
                 autoComplete="email"
               />
             </div>
-            <div className="flex flex-col gap-2">
-              <Label htmlFor="password">Password</Label>
-              <Input
-                id="password"
-                type="password"
-                required
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                autoComplete="current-password"
-              />
-            </div>
             <Button type="submit" disabled={isSubmitting}>
-              {isSubmitting ? 'Logging in...' : 'Log in'}
+              {isSubmitting ? 'Sending...' : 'Send reset link'}
             </Button>
             <p className="text-center text-sm text-muted-foreground">
-              <Link to="/forgot-password" className="underline">
-                Forgot your password?
+              <Link to="/login" className="underline">
+                Back to log in
               </Link>
             </p>
           </form>

@@ -6,6 +6,8 @@ import Login from '@/pages/Login'
 import Register from '@/pages/Register'
 import Welcome from '@/pages/Welcome'
 import CheckEmail from '@/pages/CheckEmail'
+import ForgotPassword from '@/pages/ForgotPassword'
+import ResetPassword from '@/pages/ResetPassword'
 import Dashboard from '@/pages/Dashboard'
 import LinksList from '@/pages/LinksList'
 import LinkForm from '@/pages/LinkForm'
@@ -25,6 +27,8 @@ export default function App() {
           <Route path="/register" element={<Register />} />
           <Route path="/welcome" element={<Welcome />} />
           <Route path="/check-email" element={<CheckEmail />} />
+          <Route path="/forgot-password" element={<ForgotPassword />} />
+          <Route path="/reset-password" element={<ResetPassword />} />
           <Route element={<ProtectedRoute />}>
             <Route element={<DashboardLayout />}>
               <Route path="/dashboard" element={<Dashboard />} />
