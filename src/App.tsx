@@ -8,6 +8,8 @@ import Welcome from '@/pages/Welcome'
 import CheckEmail from '@/pages/CheckEmail'
 import ForgotPassword from '@/pages/ForgotPassword'
 import ResetPassword from '@/pages/ResetPassword'
+import Terms from '@/pages/Terms'
+import Privacy from '@/pages/Privacy'
 import Dashboard from '@/pages/Dashboard'
 import LinksList from '@/pages/LinksList'
 import LinkForm from '@/pages/LinkForm'
@@ -29,6 +31,8 @@ export default function App() {
           <Route path="/check-email" element={<CheckEmail />} />
           <Route path="/forgot-password" element={<ForgotPassword />} />
           <Route path="/reset-password" element={<ResetPassword />} />
+          <Route path="/terms" element={<Terms />} />
+          <Route path="/privacy" element={<Privacy />} />
           <Route element={<ProtectedRoute />}>
             <Route element={<DashboardLayout />}>
               <Route path="/dashboard" element={<Dashboard />} />
