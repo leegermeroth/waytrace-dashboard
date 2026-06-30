@@ -5,6 +5,7 @@ import DashboardLayout from '@/components/DashboardLayout'
 import Login from '@/pages/Login'
 import Register from '@/pages/Register'
 import Welcome from '@/pages/Welcome'
+import CheckEmail from '@/pages/CheckEmail'
 import Dashboard from '@/pages/Dashboard'
 import LinksList from '@/pages/LinksList'
 import LinkForm from '@/pages/LinkForm'
@@ -23,6 +24,7 @@ export default function App() {
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
           <Route path="/welcome" element={<Welcome />} />
+          <Route path="/check-email" element={<CheckEmail />} />
           <Route element={<ProtectedRoute />}>
             <Route element={<DashboardLayout />}>
               <Route path="/dashboard" element={<Dashboard />} />
