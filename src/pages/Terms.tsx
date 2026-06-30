@@ -82,7 +82,7 @@ export default function Terms() {
 
       <h2 className="font-semibold mt-8 mb-2">9. Governing Law</h2>
       <p className="mb-4">
-        These Terms are governed by the laws of the State of Michigan, United States, without
+        These Terms are governed by the laws of the State of New Hampshire, United States, without
         regard to conflict of law principles.
       </p>
 
