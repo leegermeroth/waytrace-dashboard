@@ -231,3 +231,41 @@ export function createPortalSession() {
     body: JSON.stringify({}),
   })
 }
+
+export interface CustomDomain {
+  id: number
+  account_id: number
+  hostname: string
+  cf_custom_hostname_id: string
+  cf_route_id: string | null
+  status: 'pending' | 'active' | 'failed'
+  created_at: string
+}
+
+export async function listDomains(): Promise<{ domains: CustomDomain[]; cnameTarget: string }> {
+  const res = await fetch(`${import.meta.env.VITE_API_URL}/api/v1/domains`, {
+    headers: { 'Content-Type': 'application/json', ...authHeaders() },
+  })
+  const body = await res.json() as { success: boolean; data: CustomDomain[]; cname_target: string; error?: string }
+  if (!res.ok || !body.success) throw new Error(body.error ?? 'Failed to load domains')
+  return { domains: body.data, cnameTarget: body.cname_target }
+}
+
+export async function createDomain(hostname: string): Promise<{ domain: CustomDomain; cnameTarget: string }> {
+  const res = await fetch(`${import.meta.env.VITE_API_URL}/api/v1/domains`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...authHeaders() },
+    body: JSON.stringify({ hostname }),
+  })
+  const body = await res.json() as { success: boolean; data: CustomDomain; cname_target: string; error?: string }
+  if (!res.ok || !body.success) throw new Error(body.error ?? 'Failed to add domain')
+  return { domain: body.data, cnameTarget: body.cname_target }
+}
+
+export function refreshDomainStatus(id: number) {
+  return request<CustomDomain>(`/api/v1/domains/${id}/status`)
+}
+
+export function deleteDomain(id: number) {
+  return request<{ id: number }>(`/api/v1/domains/${id}`, { method: 'DELETE' })
+}

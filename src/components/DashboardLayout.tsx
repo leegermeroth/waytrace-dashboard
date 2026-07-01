@@ -12,6 +12,7 @@ const baseNavItems = [
 const clientsNavItem = { to: '/dashboard/clients', label: 'Clients', end: false }
 
 const trailingNavItems = [
+  { to: '/dashboard/domains', label: 'Domains', end: false },
   { to: '/dashboard/settings', label: 'Settings', end: false },
   { to: '/dashboard/billing', label: 'Billing', end: false },
 ]

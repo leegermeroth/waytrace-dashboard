@@ -18,6 +18,7 @@ import QrCodePage from '@/pages/QrCode'
 import Clients from '@/pages/Clients'
 import Settings from '@/pages/Settings'
 import Billing from '@/pages/Billing'
+import Domains from '@/pages/Domains'
 
 export default function App() {
   return (
@@ -44,6 +45,7 @@ export default function App() {
               <Route path="/dashboard/clients" element={<Clients />} />
               <Route path="/dashboard/settings" element={<Settings />} />
               <Route path="/dashboard/billing" element={<Billing />} />
+              <Route path="/dashboard/domains" element={<Domains />} />
             </Route>
           </Route>
         </Routes>
