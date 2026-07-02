@@ -8,7 +8,7 @@ import {
   XAxis,
   YAxis,
 } from 'recharts'
-import { deleteLink, getLinkStats, listLinks, type Link, type LinkStats } from '@/lib/api'
+import { deleteLink, getLinkHistory, getLinkStats, listLinks, type DestinationHistoryEntry, type Link, type LinkStats } from '@/lib/api'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Alert, AlertDescription } from '@/components/ui/alert'
@@ -18,14 +18,15 @@ export default function LinkDetail() {
   const navigate = useNavigate()
   const [link, setLink] = useState<Link | null>(null)
   const [stats, setStats] = useState<LinkStats | null>(null)
+  const [history, setHistory] = useState<DestinationHistoryEntry[]>([])
   const [error, setError] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [copied, setCopied] = useState(false)
 
   useEffect(() => {
     if (!id) return
-    Promise.all([listLinks(), getLinkStats(Number(id))])
-      .then(([links, statsData]) => {
+    Promise.all([listLinks(), getLinkStats(Number(id)), getLinkHistory(Number(id))])
+      .then(([links, statsData, historyData]) => {
         const found = links.find((l) => l.id === Number(id))
         if (!found) {
           setError('Link not found')
@@ -33,6 +34,7 @@ export default function LinkDetail() {
           setLink(found)
         }
         setStats(statsData)
+        setHistory(historyData)
       })
       .catch((err) => setError(err instanceof Error ? err.message : 'Failed to load link'))
       .finally(() => setIsLoading(false))
@@ -189,6 +191,27 @@ export default function LinkDetail() {
           </CardContent>
         </Card>
       </div>
+
+      {history.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Destination history</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <ul className="flex flex-col gap-3 text-sm">
+              {history.map((entry) => (
+                <li key={entry.id} className="flex flex-col gap-0.5 border-b pb-3 last:border-0 last:pb-0">
+                  <span className="text-muted-foreground text-xs">
+                    {new Date(entry.changed_at).toLocaleString()}
+                  </span>
+                  <span className="line-through text-muted-foreground truncate">{entry.old_destination}</span>
+                  <span className="font-medium truncate">{entry.new_destination}</span>
+                </li>
+              ))}
+            </ul>
+          </CardContent>
+        </Card>
+      )}
     </div>
   )
 }

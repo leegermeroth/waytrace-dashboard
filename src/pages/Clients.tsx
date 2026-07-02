@@ -1,5 +1,5 @@
 import { useEffect, useState, type FormEvent } from 'react'
-import { createClient, deleteClient, listClients, updateClient, type Client } from '@/lib/api'
+import { batchTaxonomyValues, createClient, deleteClient, listClients, updateClient, type Client } from '@/lib/api'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -31,13 +31,43 @@ interface ClientFormState {
 
 const emptyForm: ClientFormState = { id: null, name: '', slug: '', short_domain: '' }
 
+// -------------------------------------------------------------------------
+// Wizard platform definitions
+// -------------------------------------------------------------------------
+
+interface Platform {
+  id: string
+  label: string
+  source: string
+  medium: string
+}
+
+const PLATFORMS: Platform[] = [
+  { id: 'klaviyo',   label: 'Klaviyo (email)',  source: 'klaviyo',   medium: 'email' },
+  { id: 'facebook',  label: 'Facebook',         source: 'facebook',  medium: 'organic-social' },
+  { id: 'instagram', label: 'Instagram',        source: 'instagram', medium: 'organic-social' },
+  { id: 'linkedin',  label: 'LinkedIn',         source: 'linkedin',  medium: 'organic-social' },
+  { id: 'x',         label: 'X / Twitter',      source: 'x',         medium: 'organic-social' },
+  { id: 'youtube',   label: 'YouTube',          source: 'youtube',   medium: 'organic-social' },
+]
+
 export default function Clients() {
   const [clients, setClients] = useState<Client[]>([])
   const [error, setError] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(true)
+
+  // Client create/edit dialog
   const [dialogOpen, setDialogOpen] = useState(false)
   const [form, setForm] = useState<ClientFormState>(emptyForm)
   const [isSubmitting, setIsSubmitting] = useState(false)
+
+  // Setup wizard (appears after new client is created)
+  const [wizardClientId, setWizardClientId] = useState<number | null>(null)
+  const [wizardOpen, setWizardOpen] = useState(false)
+  const [selectedPlatforms, setSelectedPlatforms] = useState<Set<string>>(new Set())
+  const [paidSocial, setPaidSocial] = useState(false)
+  const [wizardSaving, setWizardSaving] = useState(false)
+  const [wizardError, setWizardError] = useState<string | null>(null)
 
   useEffect(() => {
     refresh()
@@ -77,11 +107,19 @@ export default function Clients() {
           slug: form.slug,
           short_domain: form.short_domain || undefined,
         })
+        setDialogOpen(false)
+        refresh()
       } else {
-        await createClient(form.name, form.slug, form.short_domain || undefined)
+        const created = await createClient(form.name, form.slug, form.short_domain || undefined)
+        setDialogOpen(false)
+        refresh()
+        // Open the setup wizard for the newly created client.
+        setWizardClientId(created.id)
+        setSelectedPlatforms(new Set())
+        setPaidSocial(false)
+        setWizardError(null)
+        setWizardOpen(true)
       }
-      setDialogOpen(false)
-      refresh()
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to save client')
     } finally {
@@ -96,6 +134,44 @@ export default function Clients() {
       setClients((prev) => prev.filter((c) => c.id !== client.id))
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to delete client')
+    }
+  }
+
+  function togglePlatform(id: string) {
+    setSelectedPlatforms((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
+
+  async function handleWizardSave() {
+    if (!wizardClientId) return
+    setWizardSaving(true)
+    setWizardError(null)
+
+    try {
+      const selected = PLATFORMS.filter((p) => selectedPlatforms.has(p.id))
+
+      // Derive unique sources and mediums from selected platforms.
+      const sources = [...new Set(selected.map((p) => p.source))]
+      const mediums = [...new Set(selected.map((p) => p.medium))]
+      if (paidSocial) mediums.push('paid-social')
+
+      const tasks: Promise<unknown>[] = []
+      if (sources.length > 0) {
+        tasks.push(batchTaxonomyValues(wizardClientId, 'utm_source', sources))
+      }
+      if (mediums.length > 0) {
+        tasks.push(batchTaxonomyValues(wizardClientId, 'utm_medium', mediums))
+      }
+      await Promise.all(tasks)
+      setWizardOpen(false)
+    } catch (err) {
+      setWizardError(err instanceof Error ? err.message : 'Failed to save taxonomy values')
+    } finally {
+      setWizardSaving(false)
     }
   }
 
@@ -154,6 +230,7 @@ export default function Clients() {
         </Table>
       )}
 
+      {/* Create / edit dialog */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent>
           <DialogHeader>
@@ -200,6 +277,68 @@ export default function Clients() {
               </Button>
             </DialogFooter>
           </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Setup wizard — appears after a new client is created */}
+      <Dialog open={wizardOpen} onOpenChange={setWizardOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Set up approved UTM values</DialogTitle>
+            <DialogDescription>
+              Pick the platforms you use. Waytrace will pre-load matching source and medium values so
+              your team stays consistent. You can add more any time.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="flex flex-col gap-3 py-2">
+            {wizardError && (
+              <Alert variant="destructive">
+                <AlertDescription>{wizardError}</AlertDescription>
+              </Alert>
+            )}
+
+            <p className="text-sm font-medium">Platforms</p>
+            <div className="grid grid-cols-2 gap-2">
+              {PLATFORMS.map((p) => (
+                <label
+                  key={p.id}
+                  className="flex cursor-pointer items-center gap-2 rounded-md border px-3 py-2 text-sm hover:bg-accent"
+                >
+                  <input
+                    type="checkbox"
+                    className="accent-primary"
+                    checked={selectedPlatforms.has(p.id)}
+                    onChange={() => togglePlatform(p.id)}
+                  />
+                  {p.label}
+                </label>
+              ))}
+            </div>
+
+            <label className="flex cursor-pointer items-center gap-2 rounded-md border px-3 py-2 text-sm hover:bg-accent">
+              <input
+                type="checkbox"
+                className="accent-primary"
+                checked={paidSocial}
+                onChange={(e) => setPaidSocial(e.target.checked)}
+              />
+              Also use paid social (adds <code className="text-xs">paid-social</code> as a medium)
+            </label>
+          </div>
+
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => setWizardOpen(false)}>
+              Skip
+            </Button>
+            <Button
+              type="button"
+              disabled={wizardSaving || (selectedPlatforms.size === 0 && !paidSocial)}
+              onClick={handleWizardSave}
+            >
+              {wizardSaving ? 'Saving…' : 'Save approved values'}
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>

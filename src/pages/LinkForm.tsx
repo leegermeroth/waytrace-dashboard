@@ -9,6 +9,7 @@ import {
   type Client,
   type Link,
 } from '@/lib/api'
+import { UtmCombobox } from '@/components/UtmCombobox'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -213,26 +214,50 @@ export default function LinkForm() {
             </div>
 
             <div className="grid grid-cols-2 gap-4">
-              <div className="flex flex-col gap-2">
-                <Label htmlFor="utm_source">UTM Source</Label>
-                <Input id="utm_source" value={utmSource} onChange={(e) => setUtmSource(e.target.value)} />
-              </div>
-              <div className="flex flex-col gap-2">
-                <Label htmlFor="utm_medium">UTM Medium</Label>
-                <Input id="utm_medium" value={utmMedium} onChange={(e) => setUtmMedium(e.target.value)} />
-              </div>
-              <div className="flex flex-col gap-2">
-                <Label htmlFor="utm_campaign">UTM Campaign</Label>
-                <Input id="utm_campaign" value={utmCampaign} onChange={(e) => setUtmCampaign(e.target.value)} />
-              </div>
-              <div className="flex flex-col gap-2">
-                <Label htmlFor="utm_term">UTM Term</Label>
-                <Input id="utm_term" value={utmTerm} onChange={(e) => setUtmTerm(e.target.value)} />
-              </div>
-              <div className="flex flex-col gap-2">
-                <Label htmlFor="utm_content">UTM Content</Label>
-                <Input id="utm_content" value={utmContent} onChange={(e) => setUtmContent(e.target.value)} />
-              </div>
+              <UtmCombobox
+                id="utm_source"
+                label="UTM Source"
+                clientId={clientId ? Number(clientId) : null}
+                field="utm_source"
+                value={utmSource}
+                onChange={setUtmSource}
+                placeholder="facebook"
+              />
+              <UtmCombobox
+                id="utm_medium"
+                label="UTM Medium"
+                clientId={clientId ? Number(clientId) : null}
+                field="utm_medium"
+                value={utmMedium}
+                onChange={setUtmMedium}
+                placeholder="social"
+              />
+              <UtmCombobox
+                id="utm_campaign"
+                label="UTM Campaign"
+                clientId={clientId ? Number(clientId) : null}
+                field="utm_campaign"
+                value={utmCampaign}
+                onChange={setUtmCampaign}
+                placeholder="summer-2026"
+              />
+              <UtmCombobox
+                id="utm_term"
+                label="UTM Term"
+                clientId={clientId ? Number(clientId) : null}
+                field="utm_term"
+                value={utmTerm}
+                onChange={setUtmTerm}
+              />
+              <UtmCombobox
+                id="utm_content"
+                label="UTM Content"
+                clientId={clientId ? Number(clientId) : null}
+                field="utm_content"
+                value={utmContent}
+                onChange={setUtmContent}
+                placeholder="hero-button"
+              />
             </div>
 
             <div className="flex gap-2">

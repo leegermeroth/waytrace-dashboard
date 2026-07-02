@@ -194,6 +194,52 @@ export function getLinkStats(id: number) {
   return request<LinkStats>(`/api/v1/links/${id}/stats`)
 }
 
+export interface DestinationHistoryEntry {
+  id: number
+  link_id: number
+  old_destination: string
+  new_destination: string
+  changed_at: string
+  changed_by_account_id: number | null
+}
+
+export function getLinkHistory(id: number) {
+  return request<DestinationHistoryEntry[]>(`/api/v1/links/${id}/history`)
+}
+
+export interface TaxonomyValue {
+  id: number
+  field: string
+  value: string
+  created_at: string
+}
+
+export function getTaxonomyValues(clientId: number, field: string, q?: string) {
+  const params = new URLSearchParams({ field })
+  if (q) params.set('q', q)
+  return request<TaxonomyValue[]>(`/api/v1/clients/${clientId}/taxonomy?${params}`)
+}
+
+export function addTaxonomyValue(clientId: number, field: string, value: string) {
+  return request<TaxonomyValue>(`/api/v1/clients/${clientId}/taxonomy`, {
+    method: 'POST',
+    body: JSON.stringify({ field, value }),
+  })
+}
+
+export function batchTaxonomyValues(clientId: number, field: string, values: string[]) {
+  return request<{ inserted: number }>(`/api/v1/clients/${clientId}/taxonomy/batch`, {
+    method: 'POST',
+    body: JSON.stringify({ field, values }),
+  })
+}
+
+export function suggestLinkValues(clientId: number, field: string, q?: string) {
+  const params = new URLSearchParams({ field })
+  if (q) params.set('q', q)
+  return request<string[]>(`/api/v1/clients/${clientId}/links/suggest?${params}`)
+}
+
 export interface Me {
   id: number
   name: string
