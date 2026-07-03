@@ -13,6 +13,21 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 
+/**
+ * The Worker only started rejecting non-http(s) destination_url values
+ * recently — this guards against rendering a `javascript:` (or other
+ * dangerous-scheme) URL as a live, clickable link for any row written
+ * before that validation existed, or written directly to D1.
+ */
+function isSafeHttpUrl(url: string): boolean {
+  try {
+    const parsed = new URL(url)
+    return parsed.protocol === 'http:' || parsed.protocol === 'https:'
+  } catch {
+    return false
+  }
+}
+
 export default function LinkDetail() {
   const { id } = useParams()
   const navigate = useNavigate()
@@ -110,9 +125,13 @@ export default function LinkDetail() {
           </div>
           <p>
             <span className="font-medium">Destination:</span>{' '}
-            <a href={link.destination_url} target="_blank" rel="noreferrer" className="hover:underline">
-              {link.destination_url}
-            </a>
+            {isSafeHttpUrl(link.destination_url) ? (
+              <a href={link.destination_url} target="_blank" rel="noreferrer" className="hover:underline">
+                {link.destination_url}
+              </a>
+            ) : (
+              <span className="text-destructive">{link.destination_url} (unsafe URL, not clickable)</span>
+            )}
           </p>
           <p>
             <span className="font-medium">Total clicks:</span> {link.clicks}
