@@ -12,22 +12,28 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 
-// Stripe Price IDs — created in the sandbox account via the Stripe API.
-// Swap these for the live-mode equivalents once the product goes live.
+// Live-mode Stripe Price IDs — must stay in sync with PRICE_TIER_MAP in
+// link-manager-worker/src/routes/stripe.ts.
 const PLANS = [
   {
     tier: 'pro',
-    label: 'Pro',
-    monthly: { priceId: 'price_1Tn4TYBG3tUOcn2lzfPxuTrd', price: '$9/mo' },
-    annual: { priceId: 'price_1Tn4TYBG3tUOcn2lB33ZaAg7', price: '$95/yr' },
+    label: 'Professional',
+    monthly: { priceId: 'price_1Toqc1Pff1p1MFpE2dEogzWq', price: '$12/mo' },
+    annual: { priceId: 'price_1Toqc0Pff1p1MFpEtDcKoP3F', price: '$95/yr' },
   },
   {
     tier: 'agency',
-    label: 'Agency',
-    monthly: { priceId: 'price_1Tn4TZBG3tUOcn2luBta64WP', price: '$25/mo' },
-    annual: { priceId: 'price_1Tn4TZBG3tUOcn2lP5vl3huq', price: '$245/yr' },
+    label: 'Team',
+    monthly: { priceId: 'price_1ToqbwPff1p1MFpEmLTk2Zxm', price: '$45/mo' },
+    annual: { priceId: 'price_1ToqbvPff1p1MFpERTomCFrQ', price: '$395/yr' },
   },
 ]
+
+const TIER_LABELS: Record<string, string> = {
+  free: 'Free Builder',
+  pro: 'Professional',
+  agency: 'Team',
+}
 
 function statusVariant(status: string | undefined): 'default' | 'secondary' | 'destructive' {
   if (status === 'active' || status === 'trialing') return 'default'
@@ -90,7 +96,7 @@ export default function Billing() {
           <CardTitle>Current plan</CardTitle>
         </CardHeader>
         <CardContent className="flex items-center gap-3">
-          <Badge className="capitalize">{me?.tier ?? '—'}</Badge>
+          <Badge className="capitalize">{me?.tier ? (TIER_LABELS[me.tier] ?? me.tier) : '—'}</Badge>
           <Badge variant={statusVariant(me?.subscription_status)} className="capitalize">
             {me?.subscription_status ?? '—'}
           </Badge>
@@ -120,6 +126,8 @@ export default function Billing() {
       <div className="grid max-w-xl gap-4 sm:grid-cols-2">
         {PLANS.map((plan) => {
           const selected = plan[interval]
+          const isCurrentPrice = me?.stripe_price_id === selected.priceId
+          const isCurrentTierOtherInterval = me?.tier === plan.tier && !isCurrentPrice
           return (
             <Card key={plan.tier}>
               <CardHeader>
@@ -129,14 +137,16 @@ export default function Billing() {
               <CardFooter>
                 <Button
                   className="w-full"
-                  disabled={me?.tier === plan.tier || pendingAction === selected.priceId}
+                  disabled={isCurrentPrice || pendingAction === selected.priceId}
                   onClick={() => handleUpgrade(selected.priceId)}
                 >
-                  {me?.tier === plan.tier
+                  {isCurrentPrice
                     ? 'Current plan'
                     : pendingAction === selected.priceId
                       ? 'Redirecting...'
-                      : `Upgrade to ${plan.label}`}
+                      : isCurrentTierOtherInterval
+                        ? `Switch to ${interval === 'annual' ? 'annual' : 'monthly'} billing`
+                        : `Upgrade to ${plan.label}`}
                 </Button>
               </CardFooter>
             </Card>

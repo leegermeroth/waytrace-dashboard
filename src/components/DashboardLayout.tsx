@@ -9,7 +9,7 @@ const baseNavItems = [
   { to: '/dashboard/qr', label: 'QR Codes', end: false },
 ]
 
-const clientsNavItem = { to: '/dashboard/clients', label: 'Clients', end: false }
+const clientsNavItem = { to: '/dashboard/clients', label: 'Workspaces', end: false }
 
 const trailingNavItems = [
   { to: '/dashboard/domains', label: 'Domains', end: false },

@@ -150,10 +150,10 @@ export default function LinkForm() {
 
             {clients.length > 1 && (
               <div className="flex flex-col gap-2">
-                <Label>Client</Label>
+                <Label>Workspace</Label>
                 <Select value={clientId} onValueChange={(v) => setClientId(v ?? '')}>
                   <SelectTrigger className="w-full">
-                    <SelectValue placeholder="Select a client" />
+                    <SelectValue placeholder="Select a workspace" />
                   </SelectTrigger>
                   <SelectContent>
                     {clients.map((c) => (

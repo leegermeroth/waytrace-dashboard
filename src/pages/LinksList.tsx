@@ -106,13 +106,13 @@ export default function LinksList() {
 
       {clients.length > 1 && (
         <div className="flex items-center gap-2">
-          <span className="text-sm text-muted-foreground">Filter by client:</span>
+          <span className="text-sm text-muted-foreground">Filter by workspace:</span>
           <Select value={clientFilter} onValueChange={(v) => setClientFilter(v ?? 'all')}>
             <SelectTrigger>
-              <SelectValue placeholder="All clients" />
+              <SelectValue placeholder="All workspaces" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">All clients</SelectItem>
+              <SelectItem value="all">All workspaces</SelectItem>
               {clients.map((c) => (
                 <SelectItem key={c.id} value={String(c.id)}>
                   {c.name}

@@ -77,7 +77,7 @@ export default function Clients() {
     setIsLoading(true)
     listClients()
       .then(setClients)
-      .catch((err) => setError(err instanceof Error ? err.message : 'Failed to load clients'))
+      .catch((err) => setError(err instanceof Error ? err.message : 'Failed to load workspaces'))
       .finally(() => setIsLoading(false))
   }
 
@@ -121,19 +121,19 @@ export default function Clients() {
         setWizardOpen(true)
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to save client')
+      setError(err instanceof Error ? err.message : 'Failed to save workspace')
     } finally {
       setIsSubmitting(false)
     }
   }
 
   async function handleDelete(client: Client) {
-    if (!confirm(`Delete "${client.name}"? Links under this client will also be removed.`)) return
+    if (!confirm(`Delete "${client.name}"? Links under this workspace will also be removed.`)) return
     try {
       await deleteClient(client.id)
       setClients((prev) => prev.filter((c) => c.id !== client.id))
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to delete client')
+      setError(err instanceof Error ? err.message : 'Failed to delete workspace')
     }
   }
 
@@ -178,8 +178,8 @@ export default function Clients() {
   return (
     <div className="flex flex-col gap-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold">Clients</h1>
-        <Button onClick={openCreate}>New client</Button>
+        <h1 className="text-2xl font-semibold">Workspaces</h1>
+        <Button onClick={openCreate}>New workspace</Button>
       </div>
 
       {error && (
@@ -189,7 +189,7 @@ export default function Clients() {
       )}
 
       {!isLoading && clients.length === 0 ? (
-        <p className="text-sm text-muted-foreground">No clients yet. Create one to get started.</p>
+        <p className="text-sm text-muted-foreground">No workspaces yet. Create one to get started.</p>
       ) : (
         <Table>
           <TableHeader>
@@ -234,9 +234,9 @@ export default function Clients() {
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>{form.id ? 'Edit client' : 'New client'}</DialogTitle>
+            <DialogTitle>{form.id ? 'Edit workspace' : 'New workspace'}</DialogTitle>
             <DialogDescription>
-              Clients group links under a brand and can have their own short domain.
+              Workspaces group links under a brand and can have their own short domain.
             </DialogDescription>
           </DialogHeader>
           <form onSubmit={handleSubmit} className="flex flex-col gap-4">

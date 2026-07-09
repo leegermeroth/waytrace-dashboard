@@ -250,6 +250,7 @@ export interface Me {
   subscription_status: string
   stripe_customer_id: string | null
   stripe_subscription_id: string | null
+  stripe_price_id: string | null
   created_at: string
 }
 
@@ -261,6 +262,20 @@ export function changePassword(current_password: string, new_password: string) {
   return request<{ ok: boolean }>('/api/v1/me/change-password', {
     method: 'POST',
     body: JSON.stringify({ current_password, new_password }),
+  })
+}
+
+export function changeEmail(new_email: string) {
+  return request<Me>('/api/v1/me/change-email', {
+    method: 'POST',
+    body: JSON.stringify({ new_email }),
+  })
+}
+
+export function resendSetupEmail(session_id: string, email?: string) {
+  return request<{ message: string; email: string }>('/api/v1/billing/resend-setup', {
+    method: 'POST',
+    body: JSON.stringify({ session_id, email }),
   })
 }
 
