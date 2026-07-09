@@ -251,6 +251,7 @@ export interface Me {
   stripe_customer_id: string | null
   stripe_subscription_id: string | null
   stripe_price_id: string | null
+  subscription_started_at: string | null
   created_at: string
 }
 
@@ -291,6 +292,13 @@ export function createPortalSession() {
     method: 'POST',
     body: JSON.stringify({}),
   })
+}
+
+export function cancelSubscription() {
+  return request<{ refunded: boolean; deleted: boolean; effective: 'immediate' | 'period_end' }>(
+    '/api/v1/billing/cancel',
+    { method: 'POST', body: JSON.stringify({}) }
+  )
 }
 
 export interface CustomDomain {

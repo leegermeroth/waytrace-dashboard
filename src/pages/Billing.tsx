@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react'
-import { createCheckoutSession, createPortalSession, getMe, type Me } from '@/lib/api'
+import { cancelSubscription, createCheckoutSession, createPortalSession, getMe, type Me } from '@/lib/api'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
+import { Input } from '@/components/ui/input'
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import {
@@ -11,6 +12,22 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
+
+const REFUND_WINDOW_DAYS = 14
+
+function withinRefundWindow(subscriptionStartedAt: string | null | undefined): boolean {
+  if (!subscriptionStartedAt) return false
+  const startedAt = new Date(subscriptionStartedAt).getTime()
+  return Date.now() - startedAt <= REFUND_WINDOW_DAYS * 24 * 60 * 60 * 1000
+}
 
 // Live-mode Stripe Price IDs — must stay in sync with PRICE_TIER_MAP in
 // link-manager-worker/src/routes/stripe.ts.
@@ -47,6 +64,11 @@ export default function Billing() {
   const [pendingAction, setPendingAction] = useState<string | null>(null)
   const [interval, setInterval] = useState<'monthly' | 'annual'>('monthly')
 
+  const [cancelDialogOpen, setCancelDialogOpen] = useState(false)
+  const [cancelConfirmText, setCancelConfirmText] = useState('')
+  const [isCancelling, setIsCancelling] = useState(false)
+  const [cancelResult, setCancelResult] = useState<string | null>(null)
+
   useEffect(() => {
     load()
   }, [])
@@ -80,6 +102,27 @@ export default function Billing() {
       setPendingAction(null)
     }
   }
+
+  async function handleCancel() {
+    setError(null)
+    setIsCancelling(true)
+    try {
+      const result = await cancelSubscription()
+      setCancelResult(
+        result.effective === 'immediate'
+          ? `Subscription cancelled${result.refunded ? ' and refunded' : ''}. Your workspaces, links, and click history have been permanently deleted.`
+          : "Subscription will cancel at the end of your current billing period. You'll keep full access until then, and your data stays intact — no refund is issued for cancellations after the 14-day window."
+      )
+      setCancelDialogOpen(false)
+      load()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to cancel subscription')
+    } finally {
+      setIsCancelling(false)
+    }
+  }
+
+  const inWindow = withinRefundWindow(me?.subscription_started_at)
 
   return (
     <div className="flex flex-col gap-6">
@@ -153,6 +196,67 @@ export default function Billing() {
           )
         })}
       </div>
+
+      {me?.stripe_subscription_id && (
+        <Card className="max-w-xl">
+          <CardHeader>
+            <CardTitle>Cancel subscription</CardTitle>
+            <CardDescription>
+              {inWindow
+                ? `You're within the ${REFUND_WINDOW_DAYS}-day refund window. Cancelling now refunds your payment in full and immediately, permanently deletes all your workspaces, links, and click history.`
+                : "You're past the refund window. Cancelling stops future billing at the end of your current period — your data is not deleted and existing links keep working."}
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {cancelResult && (
+              <Alert>
+                <AlertDescription>{cancelResult}</AlertDescription>
+              </Alert>
+            )}
+          </CardContent>
+          <CardFooter>
+            <Button variant="destructive" onClick={() => setCancelDialogOpen(true)}>
+              Cancel subscription
+            </Button>
+          </CardFooter>
+        </Card>
+      )}
+
+      <Dialog open={cancelDialogOpen} onOpenChange={(open) => { setCancelDialogOpen(open); if (!open) setCancelConfirmText('') }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Cancel your subscription?</DialogTitle>
+            <DialogDescription>
+              {inWindow
+                ? 'This immediately cancels your subscription, refunds your payment in full, and permanently deletes all workspaces, links, and click history. This cannot be undone.'
+                : "This schedules cancellation for the end of your current billing period. You'll keep access until then, no refund is issued, and your data is kept."}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex flex-col gap-2">
+            <label htmlFor="cancel-confirm" className="text-sm text-muted-foreground">
+              Type <span className="font-medium text-foreground">CANCEL</span> to confirm
+            </label>
+            <Input
+              id="cancel-confirm"
+              value={cancelConfirmText}
+              onChange={(e) => setCancelConfirmText(e.target.value)}
+              autoComplete="off"
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setCancelDialogOpen(false)}>
+              Keep subscription
+            </Button>
+            <Button
+              variant="destructive"
+              disabled={cancelConfirmText !== 'CANCEL' || isCancelling}
+              onClick={handleCancel}
+            >
+              {isCancelling ? 'Cancelling...' : 'Cancel subscription'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
