@@ -8,6 +8,15 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { PageHeader } from '@/components/brand'
 
+// Internal tier values → the customer-facing plan names used everywhere in the
+// UI (matches Billing.tsx). 'agency' is branded "Team".
+const TIER_LABELS: Record<string, string> = {
+  free: 'Free',
+  pro: 'Professional',
+  agency: 'Team',
+  enterprise: 'Enterprise',
+}
+
 export default function Settings() {
   const [me, setMe] = useState<Me | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -115,7 +124,7 @@ export default function Settings() {
           <div className="flex flex-col gap-1.5">
             <span className="eyebrow-sm">Plan</span>
             <Badge variant={me?.tier === 'free' ? 'secondary' : 'default'} className="w-fit">
-              {me?.tier ?? '—'}
+              {me ? (TIER_LABELS[me.tier] ?? me.tier) : '—'}
             </Badge>
           </div>
         </CardContent>

@@ -23,7 +23,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { buildTrackingUrl, runWithConcurrency, shortUrl } from '@/lib/links'
+import { buildTrackingUrl, normalizeDestinationUrl, runWithConcurrency, shortUrl } from '@/lib/links'
 
 interface Row {
   key: number
@@ -126,7 +126,7 @@ export default function BatchLinkForm() {
       const settled = await runWithConcurrency(toCreate, CONCURRENCY, (row) =>
         createLink({
           client_id: Number(clientId),
-          destination_url: row.destination.trim(),
+          destination_url: normalizeDestinationUrl(row.destination),
           label: row.label.trim() || undefined,
           short_code: row.shortCode.trim() || undefined,
           utm_source: row.source.trim() || undefined,
@@ -156,6 +156,16 @@ export default function BatchLinkForm() {
     setCampaign('')
   }
 
+  // Return to the builder keeping only the rows that failed, so the user can fix
+  // and re-submit them without re-creating (and duplicating) the ones that worked.
+  function backToEditing(failedKeys: number[]) {
+    setRows((prev) => {
+      const remaining = prev.filter((r) => failedKeys.includes(r.key))
+      return remaining.length ? remaining : [emptyRow()]
+    })
+    setResults(null)
+  }
+
   if (isLoading) {
     return <p className="font-serif text-sm text-muted-foreground italic">Loading…</p>
   }
@@ -172,9 +182,18 @@ export default function BatchLinkForm() {
           description={`${created.length} created${failed.length ? `, ${failed.length} failed` : ''}${campaign ? ` · campaign “${campaign}”` : ''}.`}
           actions={
             <>
-              <Button variant="outline" onClick={startOver}>
-                Create more
-              </Button>
+              {failed.length > 0 ? (
+                <Button
+                  variant="outline"
+                  onClick={() => backToEditing(failed.map((r) => r.key))}
+                >
+                  Fix {failed.length} failed
+                </Button>
+              ) : (
+                <Button variant="outline" onClick={startOver}>
+                  Create more
+                </Button>
+              )}
               <Button render={<RouterLink to="/dashboard/links" />}>Go to links</Button>
             </>
           }
@@ -327,7 +346,7 @@ export default function BatchLinkForm() {
 
       <div className="flex flex-col gap-4">
         {rows.map((row, i) => {
-          const preview = buildTrackingUrl(row.destination, {
+          const preview = buildTrackingUrl(normalizeDestinationUrl(row.destination), {
             utm_source: row.source,
             utm_medium: row.medium,
             utm_campaign: campaign,
@@ -387,10 +406,11 @@ export default function BatchLinkForm() {
                   <Label htmlFor={`dest-${row.key}`}>Destination URL</Label>
                   <Input
                     id={`dest-${row.key}`}
-                    type="url"
+                    type="text"
+                    inputMode="url"
                     value={row.destination}
                     onChange={(e) => updateRow(row.key, { destination: e.target.value })}
-                    placeholder="https://example.com/page"
+                    placeholder="example.com/page"
                   />
                 </div>
 

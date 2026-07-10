@@ -8,6 +8,7 @@ import {
   type Link,
 } from '@/lib/api'
 import { UtmCombobox } from '@/components/UtmCombobox'
+import { normalizeDestinationUrl } from '@/lib/links'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -94,7 +95,7 @@ function EditLinkForm({ id }: { id: string }) {
     try {
       await updateLink(Number(id), {
         client_id: Number(clientId),
-        destination_url: destinationUrl,
+        destination_url: normalizeDestinationUrl(destinationUrl),
         label: label || undefined,
         utm_source: utmSource || undefined,
         utm_medium: utmMedium || undefined,
@@ -160,11 +161,12 @@ function EditLinkForm({ id }: { id: string }) {
               <Label htmlFor="destination_url">Destination URL</Label>
               <Input
                 id="destination_url"
-                type="url"
+                type="text"
+                inputMode="url"
                 required
                 value={destinationUrl}
                 onChange={(e) => setDestinationUrl(e.target.value)}
-                placeholder="https://example.com/page"
+                placeholder="example.com/page"
               />
             </div>
 

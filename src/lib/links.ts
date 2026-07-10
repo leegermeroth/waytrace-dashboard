@@ -6,6 +6,19 @@ export function shortUrl(link: Pick<Link, 'short_code' | 'short_domain'>): strin
   return `https://${domain}/${link.short_code}`
 }
 
+/**
+ * Prepend `https://` to a destination that was typed without a scheme, so
+ * "example.com/page" is accepted instead of bounced by the Worker's http(s)
+ * validation. Leaves an empty string, an existing http(s):// URL, or any other
+ * explicit scheme (mailto:, tel:, …) untouched.
+ */
+export function normalizeDestinationUrl(input: string): string {
+  const trimmed = input.trim()
+  if (!trimmed) return ''
+  if (/^[a-z][a-z0-9+.-]*:\/\//i.test(trimmed) || /^(mailto|tel):/i.test(trimmed)) return trimmed
+  return `https://${trimmed}`
+}
+
 /** The five UTM columns a link carries, in canonical order. */
 export interface UtmValues {
   utm_source?: string | null
