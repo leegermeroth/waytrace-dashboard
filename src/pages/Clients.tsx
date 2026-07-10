@@ -3,9 +3,8 @@ import { batchTaxonomyValues, createClient, deleteClient, listClients, updateCli
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Badge } from '@/components/ui/badge'
 import { Alert, AlertDescription } from '@/components/ui/alert'
-import { PageHeader } from '@/components/brand'
+import { PageHeader, StatusDot } from '@/components/brand'
 import {
   Table,
   TableBody,
@@ -201,7 +200,8 @@ export default function Clients() {
           </Button>
         </div>
       ) : (
-        <Table>
+        <div className="overflow-hidden rounded-xl border border-border bg-card">
+        <Table className="[&_td]:py-2 [&_th]:h-9">
           <TableHeader>
             <TableRow>
               <TableHead>Name</TableHead>
@@ -220,16 +220,16 @@ export default function Clients() {
                   {client.short_domain || 'waygo.to'}
                 </TableCell>
                 <TableCell>
-                  <Badge variant={client.is_active ? 'success' : 'outline'}>
+                  <StatusDot tone={client.is_active ? 'success' : 'neutral'}>
                     {client.is_active ? 'Active' : 'Inactive'}
-                  </Badge>
+                  </StatusDot>
                 </TableCell>
                 <TableCell className="text-right">
-                  <div className="flex justify-end gap-2">
-                    <Button variant="outline" size="sm" onClick={() => openEdit(client)}>
+                  <div className="flex justify-end gap-1">
+                    <Button variant="ghost" size="sm" onClick={() => openEdit(client)}>
                       Edit
                     </Button>
-                    <Button variant="destructive" size="sm" onClick={() => handleDelete(client)}>
+                    <Button variant="destructive-ghost" size="sm" onClick={() => handleDelete(client)}>
                       Delete
                     </Button>
                   </div>
@@ -238,6 +238,7 @@ export default function Clients() {
             ))}
           </TableBody>
         </Table>
+        </div>
       )}
 
       {/* Create / edit dialog */}

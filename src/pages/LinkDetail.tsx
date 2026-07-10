@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link as RouterLink, useNavigate, useParams } from 'react-router-dom'
+import { Check, Copy } from 'lucide-react'
 import {
   CartesianGrid,
   Line,
@@ -110,7 +111,7 @@ export default function LinkDetail() {
             <Button variant="outline" render={<RouterLink to={`/dashboard/links/${link.id}/edit`} />}>
               Edit
             </Button>
-            <Button variant="destructive" onClick={handleDelete}>
+            <Button variant="destructive-ghost" onClick={handleDelete}>
               Delete
             </Button>
           </>
@@ -124,8 +125,18 @@ export default function LinkDetail() {
         <CardContent className="flex flex-col gap-3 text-sm">
           <div className="flex flex-wrap items-center gap-2">
             <span className="eyebrow-sm">Short URL</span>
-            <button onClick={handleCopy} className="mono text-ochre hover:text-ochre-hover">
-              {copied ? 'Copied ✓' : shortUrl(link)}
+            <button
+              onClick={handleCopy}
+              title={copied ? 'Copied' : 'Click to copy'}
+              aria-label="Copy short link"
+              className="group/copy mono inline-flex items-center gap-1.5 text-ochre hover:text-ochre-hover"
+            >
+              {shortUrl(link)}
+              {copied ? (
+                <Check className="size-3.5 text-success" />
+              ) : (
+                <Copy className="size-3.5 opacity-50 transition-opacity group-hover/copy:opacity-100" />
+              )}
             </button>
           </div>
           <div className="flex flex-col gap-1">

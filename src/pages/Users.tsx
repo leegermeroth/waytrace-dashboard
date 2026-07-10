@@ -14,7 +14,7 @@ import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { PageHeader } from '@/components/brand'
+import { PageHeader, StatusDot } from '@/components/brand'
 import {
   Table,
   TableBody,
@@ -212,7 +212,8 @@ export default function Users() {
         </Alert>
       )}
 
-      <Table>
+      <div className="overflow-hidden rounded-xl border border-border bg-card">
+      <Table className="[&_td]:py-2 [&_th]:h-9">
         <TableHeader>
           <TableRow>
             <TableHead>Name</TableHead>
@@ -232,7 +233,7 @@ export default function Users() {
                 <Badge variant="ochre">Owner</Badge>
               </TableCell>
               <TableCell>
-                <Badge variant="success">Active</Badge>
+                <StatusDot tone="success">Active</StatusDot>
               </TableCell>
               <TableCell className="eyebrow-sm text-right">You</TableCell>
             </TableRow>
@@ -257,21 +258,17 @@ export default function Users() {
                 </Select>
               </TableCell>
               <TableCell>
-                <div className="flex flex-col gap-1">
-                  <Badge variant={user.status === 'active' ? 'success' : 'outline'} className="w-fit">
+                <div className="flex flex-col gap-1.5">
+                  <StatusDot tone={user.status === 'active' ? 'success' : 'neutral'}>
                     {user.status === 'active' ? 'Active' : 'Invited'}
-                  </Badge>
-                  {!user.is_active && (
-                    <Badge variant="warning" className="w-fit">
-                      Disabled
-                    </Badge>
-                  )}
+                  </StatusDot>
+                  {!user.is_active && <StatusDot tone="warning">Disabled</StatusDot>}
                 </div>
               </TableCell>
               <TableCell className="text-right">
-                <div className="flex justify-end gap-2">
+                <div className="flex justify-end gap-1">
                   <Button
-                    variant="outline"
+                    variant="ghost"
                     size="sm"
                     disabled={busyId === user.id}
                     onClick={() => handleToggleActive(user)}
@@ -279,7 +276,7 @@ export default function Users() {
                     {user.is_active ? 'Disable' : 'Enable'}
                   </Button>
                   <Button
-                    variant="destructive"
+                    variant="destructive-ghost"
                     size="sm"
                     disabled={busyId === user.id}
                     onClick={() => handleRemove(user)}
@@ -300,6 +297,7 @@ export default function Users() {
           )}
         </TableBody>
       </Table>
+      </div>
 
       {!isLoading && users.length === 0 && me && (
         <p className="font-serif text-sm text-muted-foreground italic">

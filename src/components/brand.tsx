@@ -65,6 +65,33 @@ export function ReferenceGeometry({ className }: { className?: string }) {
 }
 
 /**
+ * Quiet status indicator — a small tone dot plus a mono-uppercase label. Used
+ * for active/inactive/invited/disabled states instead of a loud filled pill.
+ */
+export function StatusDot({
+  tone = 'neutral',
+  children,
+}: {
+  tone?: 'success' | 'warning' | 'danger' | 'neutral'
+  children: ReactNode
+}) {
+  const dot =
+    tone === 'success'
+      ? 'bg-success'
+      : tone === 'warning'
+        ? 'bg-warning'
+        : tone === 'danger'
+          ? 'bg-destructive'
+          : 'bg-slate-light'
+  return (
+    <span className="inline-flex items-center gap-1.5 font-mono text-[0.625rem] tracking-[0.08em] text-muted-foreground uppercase">
+      <span className={`size-1.5 shrink-0 rounded-full ${dot}`} aria-hidden="true" />
+      {children}
+    </span>
+  )
+}
+
+/**
  * Standard page header for dashboard screens: a mono eyebrow, an Archivo title,
  * an optional description, and a right-aligned actions slot — separated from the
  * content by a hairline, echoing the marketing section rhythm.

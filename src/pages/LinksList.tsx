@@ -4,7 +4,7 @@ import { Check, Copy } from 'lucide-react'
 import { deleteLink, listClients, listLinks, type Client, type Link } from '@/lib/api'
 import { Button } from '@/components/ui/button'
 import { Alert, AlertDescription } from '@/components/ui/alert'
-import { PageHeader } from '@/components/brand'
+import { PageHeader, StatusDot } from '@/components/brand'
 import {
   Table,
   TableBody,
@@ -161,36 +161,28 @@ export default function LinksList() {
                     </RouterLink>
                   </TableCell>
                   <TableCell>
-                    <span className="group/copy relative inline-flex">
-                      <button
-                        onClick={() => handleCopy(link)}
-                        aria-label="Copy short link"
-                        className="mono inline-flex items-center gap-1.5 text-xs text-muted-foreground transition-colors hover:text-ochre"
-                      >
-                        {shortUrl(link).replace('https://', '')}
-                        {copiedId === link.id ? (
-                          <Check className="size-3.5 text-success" />
-                        ) : (
-                          <Copy className="size-3.5 opacity-50 transition-opacity group-hover/copy:opacity-100" />
-                        )}
-                      </button>
-                      <span className="pointer-events-none absolute -top-7 left-0 z-10 rounded-[3px] bg-graphite px-2 py-1 font-mono text-[9px] tracking-[0.1em] whitespace-nowrap text-paper uppercase opacity-0 transition-opacity group-hover/copy:opacity-100">
-                        {copiedId === link.id ? 'Copied' : 'Click to copy'}
-                      </span>
-                    </span>
+                    <button
+                      onClick={() => handleCopy(link)}
+                      title={copiedId === link.id ? 'Copied' : 'Click to copy'}
+                      aria-label="Copy short link"
+                      className="group/copy mono inline-flex items-center gap-1.5 text-xs text-muted-foreground transition-colors hover:text-ochre"
+                    >
+                      {shortUrl(link).replace('https://', '')}
+                      {copiedId === link.id ? (
+                        <Check className="size-3.5 text-success" />
+                      ) : (
+                        <Copy className="size-3.5 opacity-50 transition-opacity group-hover/copy:opacity-100" />
+                      )}
+                    </button>
                   </TableCell>
                   <TableCell className="mono max-w-64 truncate text-xs text-muted-foreground">
                     {link.destination_url}
                   </TableCell>
                   <TableCell className="mono">{link.clicks}</TableCell>
                   <TableCell>
-                    <span className="inline-flex items-center gap-1.5 font-mono text-[0.625rem] tracking-[0.08em] text-muted-foreground uppercase">
-                      <span
-                        className={`size-1.5 rounded-full ${link.is_active ? 'bg-success' : 'bg-slate-light'}`}
-                        aria-hidden="true"
-                      />
+                    <StatusDot tone={link.is_active ? 'success' : 'neutral'}>
                       {link.is_active ? 'Active' : 'Inactive'}
-                    </span>
+                    </StatusDot>
                   </TableCell>
                   <TableCell className="text-right">
                     <div className="flex justify-end gap-1">
