@@ -16,7 +16,6 @@ import Dashboard from '@/pages/Dashboard'
 import LinksList from '@/pages/LinksList'
 import LinkForm from '@/pages/LinkForm'
 import LinkDetail from '@/pages/LinkDetail'
-import QrCodePage from '@/pages/QrCode'
 import Clients from '@/pages/Clients'
 import Settings from '@/pages/Settings'
 import Users from '@/pages/Users'
@@ -45,7 +44,6 @@ export default function App() {
               <Route path="/dashboard/links/new" element={<LinkForm />} />
               <Route path="/dashboard/links/:id" element={<LinkDetail />} />
               <Route path="/dashboard/links/:id/edit" element={<LinkForm />} />
-              <Route path="/dashboard/qr" element={<QrCodePage />} />
               <Route path="/dashboard/settings" element={<Settings />} />
               {/* Owner/admin only — contributors are redirected to /dashboard. */}
               <Route element={<AdminRoute />}>

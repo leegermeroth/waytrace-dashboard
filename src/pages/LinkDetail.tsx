@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link as RouterLink, useNavigate, useParams } from 'react-router-dom'
-import { Check, Copy } from 'lucide-react'
+import { Check, Copy, QrCode as QrIcon } from 'lucide-react'
 import {
   CartesianGrid,
   Line,
@@ -15,6 +15,8 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { PageHeader } from '@/components/brand'
+import { QrDialog } from '@/components/QrDialog'
+import { buildTrackingUrl, shortUrl } from '@/lib/links'
 
 /**
  * The Worker only started rejecting non-http(s) destination_url values
@@ -40,6 +42,8 @@ export default function LinkDetail() {
   const [error, setError] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [copied, setCopied] = useState(false)
+  const [trackingCopied, setTrackingCopied] = useState(false)
+  const [qrOpen, setQrOpen] = useState(false)
 
   useEffect(() => {
     if (!id) return
@@ -58,16 +62,18 @@ export default function LinkDetail() {
       .finally(() => setIsLoading(false))
   }, [id])
 
-  function shortUrl(l: Link) {
-    const domain = l.short_domain || 'waygo.to'
-    return `https://${domain}/${l.short_code}`
-  }
-
   async function handleCopy() {
     if (!link) return
     await navigator.clipboard.writeText(shortUrl(link))
     setCopied(true)
     setTimeout(() => setCopied(false), 1500)
+  }
+
+  async function handleCopyTracking() {
+    if (!link) return
+    await navigator.clipboard.writeText(buildTrackingUrl(link.destination_url, link))
+    setTrackingCopied(true)
+    setTimeout(() => setTrackingCopied(false), 1500)
   }
 
   async function handleDelete() {
@@ -108,6 +114,10 @@ export default function LinkDetail() {
         title={link.label || link.short_code}
         actions={
           <>
+            <Button variant="outline" onClick={() => setQrOpen(true)}>
+              <QrIcon className="size-3.5" />
+              QR code
+            </Button>
             <Button variant="outline" render={<RouterLink to={`/dashboard/links/${link.id}/edit`} />}>
               Edit
             </Button>
@@ -155,6 +165,24 @@ export default function LinkDetail() {
                 {link.destination_url} (unsafe URL, not clickable)
               </span>
             )}
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="eyebrow-sm">Tracking URL</span>
+            <button
+              onClick={handleCopyTracking}
+              title={trackingCopied ? 'Copied' : 'Click to copy'}
+              aria-label="Copy tracking URL"
+              className="group/copy mono inline-flex max-w-full cursor-pointer items-center gap-1.5 truncate text-xs text-muted-foreground hover:text-ochre"
+            >
+              <span className="truncate">
+                {buildTrackingUrl(link.destination_url, link).replace('https://', '')}
+              </span>
+              {trackingCopied ? (
+                <Check className="size-3.5 shrink-0 text-success" />
+              ) : (
+                <Copy className="size-3.5 shrink-0 opacity-50 transition-opacity group-hover/copy:opacity-100" />
+              )}
+            </button>
           </div>
           <div className="flex gap-8">
             <div className="flex flex-col gap-1">
@@ -286,6 +314,13 @@ export default function LinkDetail() {
           </CardContent>
         </Card>
       )}
+
+      <QrDialog
+        open={qrOpen}
+        onOpenChange={setQrOpen}
+        url={shortUrl(link)}
+        label={link.label || link.short_code}
+      />
     </div>
   )
 }

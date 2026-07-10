@@ -6,7 +6,6 @@ import { cn } from '@/lib/utils'
 const baseNavItems = [
   { to: '/dashboard', label: 'Home', end: true },
   { to: '/dashboard/links', label: 'Links', end: false },
-  { to: '/dashboard/qr', label: 'QR Codes', end: false },
 ]
 
 const clientsNavItem = { to: '/dashboard/clients', label: 'Workspaces', end: false }

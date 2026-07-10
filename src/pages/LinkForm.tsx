@@ -1,8 +1,6 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import {
-  createClient,
-  createLink,
   listClients,
   listLinks,
   updateLink,
@@ -16,6 +14,7 @@ import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { PageHeader } from '@/components/brand'
+import BatchLinkForm from '@/pages/BatchLinkForm'
 import {
   Select,
   SelectContent,
@@ -24,16 +23,22 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 
+/**
+ * Dispatcher: creating links uses the batch-first builder; editing an existing
+ * link keeps the focused single-link form below.
+ */
 export default function LinkForm() {
   const { id } = useParams()
-  const isEdit = Boolean(id)
+  return id ? <EditLinkForm id={id} /> : <BatchLinkForm />
+}
+
+function EditLinkForm({ id }: { id: string }) {
   const navigate = useNavigate()
 
   const [clients, setClients] = useState<Client[]>([])
   const [clientId, setClientId] = useState<string>('')
   const [destinationUrl, setDestinationUrl] = useState('')
   const [label, setLabel] = useState('')
-  const [shortCode, setShortCode] = useState('')
   const [linkType, setLinkType] = useState('short')
   const [utmSource, setUtmSource] = useState('')
   const [utmMedium, setUtmMedium] = useState('')
@@ -48,24 +53,15 @@ export default function LinkForm() {
   useEffect(() => {
     async function load() {
       try {
-        let clientList = await listClients()
-
-        if (clientList.length === 0) {
-          const created = await createClient('My Links', `my-links-${Date.now().toString(36)}`)
-          clientList = [created]
-        }
+        const clientList = await listClients()
         setClients(clientList)
 
-        if (isEdit && id) {
-          const links = await listLinks()
-          const link = links.find((l) => l.id === Number(id))
-          if (!link) {
-            setError('Link not found')
-          } else {
-            populateForm(link)
-          }
+        const links = await listLinks()
+        const link = links.find((l) => l.id === Number(id))
+        if (!link) {
+          setError('Link not found')
         } else {
-          setClientId(String(clientList[0].id))
+          populateForm(link)
         }
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Failed to load form')
@@ -82,7 +78,6 @@ export default function LinkForm() {
     setClientId(String(link.client_id))
     setDestinationUrl(link.destination_url)
     setLabel(link.label ?? '')
-    setShortCode(link.short_code)
     setLinkType(link.link_type)
     setUtmSource(link.utm_source ?? '')
     setUtmMedium(link.utm_medium ?? '')
@@ -97,7 +92,7 @@ export default function LinkForm() {
     setIsSubmitting(true)
 
     try {
-      const input = {
+      await updateLink(Number(id), {
         client_id: Number(clientId),
         destination_url: destinationUrl,
         label: label || undefined,
@@ -107,18 +102,8 @@ export default function LinkForm() {
         utm_term: utmTerm || undefined,
         utm_content: utmContent || undefined,
         link_type: linkType,
-      }
-
-      if (isEdit && id) {
-        await updateLink(Number(id), input)
-        navigate(`/dashboard/links/${id}`)
-      } else {
-        const created = await createLink({
-          ...input,
-          short_code: shortCode || undefined,
-        })
-        navigate(`/dashboard/links/${created.id}`)
-      }
+      })
+      navigate(`/dashboard/links/${id}`)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to save link')
     } finally {
@@ -134,13 +119,13 @@ export default function LinkForm() {
     <div className="flex flex-col gap-6">
       <PageHeader
         eyebrow="Build"
-        title={isEdit ? 'Edit link' : 'New link'}
-        description="Set the destination and consistent UTM parameters for this campaign link."
+        title="Edit link"
+        description="Update the destination and UTM parameters for this campaign link."
       />
 
       <Card className="max-w-xl">
         <CardHeader>
-          <CardTitle>{isEdit ? 'Link details' : 'Create a link'}</CardTitle>
+          <CardTitle>Link details</CardTitle>
           <CardDescription>
             Set the destination URL and optional UTM parameters for tracking.
           </CardDescription>
@@ -193,18 +178,6 @@ export default function LinkForm() {
               />
             </div>
 
-            {!isEdit && (
-              <div className="flex flex-col gap-2">
-                <Label htmlFor="short_code">Short code (optional)</Label>
-                <Input
-                  id="short_code"
-                  value={shortCode}
-                  onChange={(e) => setShortCode(e.target.value.toLowerCase())}
-                  placeholder="Auto-generated if left blank"
-                />
-              </div>
-            )}
-
             <div className="flex flex-col gap-2">
               <Label>Link type</Label>
               <Select value={linkType} onValueChange={(v) => setLinkType(v ?? 'short')}>
@@ -235,7 +208,8 @@ export default function LinkForm() {
                 field="utm_medium"
                 value={utmMedium}
                 onChange={setUtmMedium}
-                placeholder="social"
+                placeholder="paid-social"
+                relatedSource={utmSource}
               />
               <UtmCombobox
                 id="utm_campaign"
@@ -267,7 +241,7 @@ export default function LinkForm() {
 
             <div className="flex gap-2">
               <Button type="submit" disabled={isSubmitting}>
-                {isSubmitting ? 'Saving...' : isEdit ? 'Save changes' : 'Create link'}
+                {isSubmitting ? 'Saving...' : 'Save changes'}
               </Button>
               <Button type="button" variant="outline" onClick={() => navigate(-1)}>
                 Cancel

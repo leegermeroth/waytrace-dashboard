@@ -14,29 +14,91 @@ interface Props {
   value: string
   onChange: (v: string) => void
   placeholder?: string
+  /**
+   * When this is a utm_medium field, the chosen source for the same row. Lets us
+   * surface the most logical mediums for that source at the top of the list.
+   */
+  relatedSource?: string
 }
 
 // Source and medium have a governed taxonomy table; others pull from existing link data.
 const GOVERNED: Set<UtmField> = new Set(['utm_source', 'utm_medium'])
 
-export function UtmCombobox({ id, label, clientId, field, value, onChange, placeholder }: Props) {
+/**
+ * Static source → suggested-medium lookup. When a source is picked, these
+ * mediums float to the top of the medium combobox — always overridable, never a
+ * hard lock. Matched case-insensitively on a normalized source token, so
+ * "Facebook", "facebook", and "facebook-ads" all resolve to the facebook entry.
+ */
+const SOURCE_MEDIUM_SUGGESTIONS: Record<string, string[]> = {
+  facebook: ['organic-social', 'paid-social'],
+  instagram: ['organic-social', 'paid-social'],
+  tiktok: ['organic-social', 'paid-social'],
+  google: ['cpc', 'organic'],
+  bing: ['cpc', 'organic'],
+  klaviyo: ['email'],
+  newsletter: ['email'],
+  linkedin: ['organic-social', 'paid-social', 'b2b'],
+  youtube: ['video', 'social'],
+}
+
+/** Suggested mediums for a source value, or [] if none are known. */
+export function mediumSuggestionsForSource(source: string | undefined): string[] {
+  if (!source) return []
+  const token = source.trim().toLowerCase()
+  if (!token) return []
+  // Prefer an exact match, then a prefix match (e.g. "facebook-ads" → facebook).
+  if (SOURCE_MEDIUM_SUGGESTIONS[token]) return SOURCE_MEDIUM_SUGGESTIONS[token]
+  const key = Object.keys(SOURCE_MEDIUM_SUGGESTIONS).find((k) => token.startsWith(k))
+  return key ? SOURCE_MEDIUM_SUGGESTIONS[key] : []
+}
+
+export function UtmCombobox({
+  id,
+  label,
+  clientId,
+  field,
+  value,
+  onChange,
+  placeholder,
+  relatedSource,
+}: Props) {
   const { isContributor } = useAuth()
   const [suggestions, setSuggestions] = useState<string[]>([])
   const [open, setOpen] = useState(false)
   const containerRef = useRef<HTMLDivElement>(null)
 
+  // Intelligent mediums for the chosen source, filtered to the current query.
+  // These lead the list; the governed taxonomy values follow (deduped).
+  function smartMediums(q: string): string[] {
+    if (field !== 'utm_medium') return []
+    const token = q.trim().toLowerCase()
+    return mediumSuggestionsForSource(relatedSource).filter(
+      (m) => !token || m.toLowerCase().includes(token)
+    )
+  }
+
   async function fetchSuggestions(q: string) {
-    if (!clientId) return
+    if (!clientId) {
+      // Even with no workspace yet, still show the static medium hints.
+      setSuggestions(smartMediums(q))
+      return
+    }
+    const lead = smartMediums(q)
     try {
+      let fetched: string[]
       if (GOVERNED.has(field)) {
         const vals = await getTaxonomyValues(clientId, field, q || undefined)
-        setSuggestions(vals.map((v) => v.value))
+        fetched = vals.map((v) => v.value)
       } else {
-        const vals = await suggestLinkValues(clientId, field, q || undefined)
-        setSuggestions(vals)
+        fetched = await suggestLinkValues(clientId, field, q || undefined)
       }
+      // Smart suggestions first, then taxonomy values, de-duplicated.
+      const merged = [...lead, ...fetched.filter((v) => !lead.includes(v))]
+      setSuggestions(merged)
     } catch {
-      // Silently ignore fetch errors — suggestions are non-critical.
+      // Silently fall back to the static hints — suggestions are non-critical.
+      setSuggestions(lead)
     }
   }
 

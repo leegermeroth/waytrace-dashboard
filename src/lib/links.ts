@@ -1,0 +1,77 @@
+import type { Link } from '@/lib/api'
+
+/** The public short URL for a link (the redirect appends UTMs server-side). */
+export function shortUrl(link: Pick<Link, 'short_code' | 'short_domain'>): string {
+  const domain = link.short_domain || 'waygo.to'
+  return `https://${domain}/${link.short_code}`
+}
+
+/** The five UTM columns a link carries, in canonical order. */
+export interface UtmValues {
+  utm_source?: string | null
+  utm_medium?: string | null
+  utm_campaign?: string | null
+  utm_term?: string | null
+  utm_content?: string | null
+}
+
+/**
+ * The fully-expanded tracking URL: the destination with UTM parameters appended
+ * as query params. This is what the Worker actually redirects to (see the
+ * redirect handler in the Worker's index.ts), so it's the canonical "tracking
+ * URL" — usable directly even without going through the short link.
+ *
+ * Returns the raw destination unchanged if it isn't a parseable absolute URL, so
+ * a half-typed destination in the batch form still previews something sensible.
+ */
+export function buildTrackingUrl(destination: string, utm: UtmValues): string {
+  if (!destination) return ''
+  let url: URL
+  try {
+    url = new URL(destination)
+  } catch {
+    return destination
+  }
+  const params: [keyof UtmValues, string | null | undefined][] = [
+    ['utm_source', utm.utm_source],
+    ['utm_medium', utm.utm_medium],
+    ['utm_campaign', utm.utm_campaign],
+    ['utm_term', utm.utm_term],
+    ['utm_content', utm.utm_content],
+  ]
+  for (const [key, value] of params) {
+    const trimmed = value?.trim()
+    if (trimmed) url.searchParams.set(key, trimmed)
+  }
+  return url.toString()
+}
+
+/**
+ * Run an async `fn` over `items` with a bounded number of in-flight calls, in
+ * input order, collecting a settled result per item. Used by batch link
+ * creation to fire the existing single-create endpoint a few rows at a time
+ * without a Worker batch endpoint, while reporting per-row success/failure.
+ */
+export async function runWithConcurrency<T, R>(
+  items: T[],
+  limit: number,
+  fn: (item: T, index: number) => Promise<R>
+): Promise<{ value?: R; error?: unknown }[]> {
+  const results: { value?: R; error?: unknown }[] = new Array(items.length)
+  let cursor = 0
+
+  async function worker() {
+    while (cursor < items.length) {
+      const index = cursor++
+      try {
+        results[index] = { value: await fn(items[index], index) }
+      } catch (error) {
+        results[index] = { error }
+      }
+    }
+  }
+
+  const pool = Array.from({ length: Math.min(limit, items.length) }, worker)
+  await Promise.all(pool)
+  return results
+}
