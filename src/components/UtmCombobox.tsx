@@ -100,8 +100,8 @@ export function UtmCombobox({ id, label, clientId, field, value, onChange, place
           autoComplete="off"
         />
         {showDropdown && (
-          <div className="absolute z-50 mt-1 w-full rounded-md border border-border bg-popover shadow-md">
-            <ul className="max-h-48 overflow-auto py-1 text-sm">
+          <div className="absolute z-50 mt-1 w-full rounded-md border border-border bg-popover shadow-sm">
+            <ul className="mono max-h-48 overflow-auto py-1 text-sm">
               {suggestions.map((s) => (
                 <li
                   key={s}
@@ -115,7 +115,7 @@ export function UtmCombobox({ id, label, clientId, field, value, onChange, place
               {showAdd && (
                 <li
                   onMouseDown={(e) => { e.preventDefault(); handleAddNew() }}
-                  className="cursor-pointer border-t border-border px-3 py-1.5 text-primary hover:bg-accent hover:text-accent-foreground"
+                  className="cursor-pointer border-t border-border px-3 py-1.5 text-ochre hover:bg-accent"
                 >
                   Add "{trimmed}"
                 </li>

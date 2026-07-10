@@ -5,6 +5,7 @@ import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
 import { Alert, AlertDescription } from '@/components/ui/alert'
+import { PageHeader } from '@/components/brand'
 import {
   Select,
   SelectContent,
@@ -52,8 +53,8 @@ const TIER_LABELS: Record<string, string> = {
   agency: 'Team',
 }
 
-function statusVariant(status: string | undefined): 'default' | 'secondary' | 'destructive' {
-  if (status === 'active' || status === 'trialing') return 'default'
+function statusVariant(status: string | undefined): 'success' | 'secondary' | 'destructive' {
+  if (status === 'active' || status === 'trialing') return 'success'
   if (status === 'cancelled' || status === 'unpaid') return 'destructive'
   return 'secondary'
 }
@@ -126,7 +127,11 @@ export default function Billing() {
 
   return (
     <div className="flex flex-col gap-6">
-      <h1 className="text-2xl font-semibold">Billing</h1>
+      <PageHeader
+        eyebrow="Billing"
+        title="Billing"
+        description="Manage your plan, billing interval, and subscription."
+      />
 
       {error && (
         <Alert variant="destructive">
@@ -153,8 +158,8 @@ export default function Billing() {
         )}
       </Card>
 
-      <div className="flex max-w-xl items-center gap-2">
-        <span className="text-sm text-muted-foreground">Billing interval:</span>
+      <div className="flex max-w-xl items-center gap-3">
+        <span className="eyebrow-sm">Billing interval</span>
         <Select value={interval} onValueChange={(v) => setInterval((v as 'monthly' | 'annual') ?? 'monthly')}>
           <SelectTrigger className="w-36">
             <SelectValue />
@@ -174,8 +179,10 @@ export default function Billing() {
           return (
             <Card key={plan.tier}>
               <CardHeader>
-                <CardTitle className="capitalize">{plan.label}</CardTitle>
-                <CardDescription>{selected.price}</CardDescription>
+                <CardTitle>{plan.label}</CardTitle>
+                <CardDescription className="mono pt-1 text-base text-foreground">
+                  {selected.price}
+                </CardDescription>
               </CardHeader>
               <CardFooter>
                 <Button

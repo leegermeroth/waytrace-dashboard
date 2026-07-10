@@ -6,6 +6,7 @@ import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Alert, AlertDescription } from '@/components/ui/alert'
+import { PageHeader } from '@/components/brand'
 
 export default function Domains() {
   const [domains, setDomains] = useState<CustomDomain[]>([])
@@ -75,7 +76,11 @@ export default function Domains() {
 
   return (
     <div className="flex flex-col gap-6">
-      <h1 className="text-2xl font-semibold">Custom Domains</h1>
+      <PageHeader
+        eyebrow="Team"
+        title="Custom domains"
+        description="Use your own branded domain for short links."
+      />
 
       {loadError && (
         <Alert variant="destructive">
@@ -143,12 +148,12 @@ export default function Domains() {
             )}
           </CardHeader>
           <CardContent>
-            <div className="flex flex-col divide-y">
+            <div className="flex flex-col divide-y divide-border">
               {domains.map((domain) => (
                 <div key={domain.id} className="flex items-center justify-between gap-4 py-3">
                   <div className="flex flex-col gap-0.5">
-                    <span className="font-medium text-sm">{domain.hostname}</span>
-                    <span className="text-xs text-muted-foreground">
+                    <span className="mono text-sm font-medium">{domain.hostname}</span>
+                    <span className="eyebrow-sm">
                       Added {new Date(domain.created_at).toLocaleDateString()}
                     </span>
                   </div>
@@ -184,7 +189,7 @@ export default function Domains() {
 }
 
 function StatusBadge({ status }: { status: CustomDomain['status'] }) {
-  if (status === 'active') return <Badge variant="default">Active</Badge>
+  if (status === 'active') return <Badge variant="success">Active</Badge>
   if (status === 'failed') return <Badge variant="destructive">Failed</Badge>
-  return <Badge variant="secondary">Pending CNAME</Badge>
+  return <Badge variant="warning">Pending CNAME</Badge>
 }

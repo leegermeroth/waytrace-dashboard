@@ -4,6 +4,7 @@ import { deleteLink, listClients, listLinks, type Client, type Link } from '@/li
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Alert, AlertDescription } from '@/components/ui/alert'
+import { PageHeader } from '@/components/brand'
 import {
   Table,
   TableBody,
@@ -93,10 +94,12 @@ export default function LinksList() {
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold">Links</h1>
-        <Button render={<RouterLink to="/dashboard/links/new" />}>New link</Button>
-      </div>
+      <PageHeader
+        eyebrow="Link library"
+        title="Links"
+        description="Every saved tracking link, with its short URL, destination, and clicks."
+        actions={<Button render={<RouterLink to="/dashboard/links/new" />}>New link</Button>}
+      />
 
       {error && (
         <Alert variant="destructive">
@@ -105,8 +108,8 @@ export default function LinksList() {
       )}
 
       {clients.length > 1 && (
-        <div className="flex items-center gap-2">
-          <span className="text-sm text-muted-foreground">Filter by workspace:</span>
+        <div className="flex items-center gap-3">
+          <span className="eyebrow-sm">Filter by workspace</span>
           <Select value={clientFilter} onValueChange={(v) => setClientFilter(v ?? 'all')}>
             <SelectTrigger>
               <SelectValue placeholder="All workspaces" />
@@ -124,13 +127,14 @@ export default function LinksList() {
       )}
 
       {!isLoading && filtered.length === 0 ? (
-        <p className="text-sm text-muted-foreground">
-          No links yet.{' '}
-          <RouterLink to="/dashboard/links/new" className="underline">
+        <div className="dot-grid-well rounded-xl border border-border p-10 text-center">
+          <p className="font-serif text-[15px] text-muted-foreground italic">
+            No links yet. Saved links, their short URLs, and click history will appear here.
+          </p>
+          <Button className="mt-4" render={<RouterLink to="/dashboard/links/new" />}>
             Create your first link
-          </RouterLink>
-          .
-        </p>
+          </Button>
+        </div>
       ) : (
         <Table>
           <TableHeader>
@@ -151,24 +155,24 @@ export default function LinksList() {
             {filtered.map((link) => (
               <TableRow key={link.id}>
                 <TableCell>
-                  <RouterLink to={`/dashboard/links/${link.id}`} className="font-medium hover:underline">
+                  <RouterLink to={`/dashboard/links/${link.id}`} className="font-medium hover:text-ochre">
                     {link.label || link.short_code}
                   </RouterLink>
                 </TableCell>
                 <TableCell>
                   <button
                     onClick={() => handleCopy(link)}
-                    className="text-muted-foreground hover:text-foreground hover:underline"
+                    className="mono text-xs text-muted-foreground hover:text-ochre"
                   >
-                    {copiedId === link.id ? 'Copied!' : shortUrl(link).replace('https://', '')}
+                    {copiedId === link.id ? 'Copied ✓' : shortUrl(link).replace('https://', '')}
                   </button>
                 </TableCell>
-                <TableCell className="max-w-64 truncate text-muted-foreground">
+                <TableCell className="mono max-w-64 truncate text-xs text-muted-foreground">
                   {link.destination_url}
                 </TableCell>
-                <TableCell>{link.clicks}</TableCell>
+                <TableCell className="mono">{link.clicks}</TableCell>
                 <TableCell>
-                  <Badge variant={link.is_active ? 'default' : 'secondary'}>
+                  <Badge variant={link.is_active ? 'success' : 'outline'}>
                     {link.is_active ? 'Active' : 'Inactive'}
                   </Badge>
                 </TableCell>

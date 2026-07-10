@@ -15,6 +15,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Alert, AlertDescription } from '@/components/ui/alert'
+import { PageHeader } from '@/components/brand'
 import {
   Select,
   SelectContent,
@@ -126,12 +127,16 @@ export default function LinkForm() {
   }
 
   if (isLoading) {
-    return <p className="text-sm text-muted-foreground">Loading...</p>
+    return <p className="font-serif text-sm text-muted-foreground italic">Loading…</p>
   }
 
   return (
     <div className="flex flex-col gap-6">
-      <h1 className="text-2xl font-semibold">{isEdit ? 'Edit link' : 'New link'}</h1>
+      <PageHeader
+        eyebrow="Build"
+        title={isEdit ? 'Edit link' : 'New link'}
+        description="Set the destination and consistent UTM parameters for this campaign link."
+      />
 
       <Card className="max-w-xl">
         <CardHeader>

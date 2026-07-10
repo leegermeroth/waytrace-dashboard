@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Alert, AlertDescription } from '@/components/ui/alert'
+import { PageHeader } from '@/components/brand'
 import {
   Select,
   SelectContent,
@@ -89,7 +90,11 @@ export default function QrCodePage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <h1 className="text-2xl font-semibold">QR codes</h1>
+      <PageHeader
+        eyebrow="QR codes"
+        title="QR codes"
+        description="Generate a scannable code for any saved link or custom URL."
+      />
 
       {error && (
         <Alert variant="destructive">
@@ -173,11 +178,13 @@ export default function QrCodePage() {
             <CardTitle>Preview</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="flex aspect-square items-center justify-center rounded-md border bg-muted/30">
+            <div className="dot-grid-well flex aspect-square items-center justify-center rounded-md border border-border">
               {dataUrl ? (
                 <img src={dataUrl} alt="QR code preview" className="h-64 w-64" />
               ) : (
-                <p className="text-sm text-muted-foreground">Enter a URL to preview the QR code</p>
+                <p className="font-serif text-sm text-muted-foreground italic">
+                  Enter a URL to preview the QR code.
+                </p>
               )}
             </div>
           </CardContent>

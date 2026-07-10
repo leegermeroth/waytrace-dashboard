@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link as RouterLink, useNavigate, useParams } from 'react-router-dom'
 import {
+  CartesianGrid,
   Line,
   LineChart,
   ResponsiveContainer,
@@ -12,6 +13,7 @@ import { deleteLink, getLinkHistory, getLinkStats, listLinks, type DestinationHi
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Alert, AlertDescription } from '@/components/ui/alert'
+import { PageHeader } from '@/components/brand'
 
 /**
  * The Worker only started rejecting non-http(s) destination_url values
@@ -79,7 +81,7 @@ export default function LinkDetail() {
   }
 
   if (isLoading) {
-    return <p className="text-sm text-muted-foreground">Loading...</p>
+    return <p className="font-serif text-sm text-muted-foreground italic">Loading…</p>
   }
 
   if (error || !link) {
@@ -100,46 +102,61 @@ export default function LinkDetail() {
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold">{link.label || link.short_code}</h1>
-        <div className="flex gap-2">
-          <Button variant="outline" render={<RouterLink to={`/dashboard/links/${link.id}/edit`} />}>
-            Edit
-          </Button>
-          <Button variant="destructive" onClick={handleDelete}>
-            Delete
-          </Button>
-        </div>
-      </div>
+      <PageHeader
+        eyebrow="Link detail"
+        title={link.label || link.short_code}
+        actions={
+          <>
+            <Button variant="outline" render={<RouterLink to={`/dashboard/links/${link.id}/edit`} />}>
+              Edit
+            </Button>
+            <Button variant="destructive" onClick={handleDelete}>
+              Delete
+            </Button>
+          </>
+        }
+      />
 
       <Card>
         <CardHeader>
           <CardTitle>Overview</CardTitle>
         </CardHeader>
-        <CardContent className="flex flex-col gap-2 text-sm">
-          <div className="flex items-center gap-2">
-            <span className="font-medium">Short URL:</span>
-            <button onClick={handleCopy} className="text-primary hover:underline">
-              {copied ? 'Copied!' : shortUrl(link)}
+        <CardContent className="flex flex-col gap-3 text-sm">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="eyebrow-sm">Short URL</span>
+            <button onClick={handleCopy} className="mono text-ochre hover:text-ochre-hover">
+              {copied ? 'Copied ✓' : shortUrl(link)}
             </button>
           </div>
-          <p>
-            <span className="font-medium">Destination:</span>{' '}
+          <div className="flex flex-col gap-1">
+            <span className="eyebrow-sm">Destination</span>{' '}
             {isSafeHttpUrl(link.destination_url) ? (
-              <a href={link.destination_url} target="_blank" rel="noreferrer" className="hover:underline">
+              <a
+                href={link.destination_url}
+                target="_blank"
+                rel="noreferrer"
+                className="mono truncate text-xs text-muted-foreground hover:text-ochre"
+              >
                 {link.destination_url}
               </a>
             ) : (
-              <span className="text-destructive">{link.destination_url} (unsafe URL, not clickable)</span>
+              <span className="mono text-xs text-destructive">
+                {link.destination_url} (unsafe URL, not clickable)
+              </span>
             )}
-          </p>
-          <p>
-            <span className="font-medium">Total clicks:</span> {link.clicks}
-          </p>
-          <p>
-            <span className="font-medium">Created:</span>{' '}
-            {new Date(link.created_at).toLocaleDateString()}
-          </p>
+          </div>
+          <div className="flex gap-8">
+            <div className="flex flex-col gap-1">
+              <span className="eyebrow-sm">Total clicks</span>
+              <span className="mono text-foreground">{link.clicks}</span>
+            </div>
+            <div className="flex flex-col gap-1">
+              <span className="eyebrow-sm">Created</span>
+              <span className="mono text-muted-foreground">
+                {new Date(link.created_at).toLocaleDateString()}
+              </span>
+            </div>
+          </div>
         </CardContent>
       </Card>
 
@@ -150,18 +167,45 @@ export default function LinkDetail() {
         </CardHeader>
         <CardContent>
           {stats && stats.clicksByDay.length > 0 ? (
-            <div className="h-64">
+            <div className="dot-grid-well h-64 rounded-md border border-border p-3">
               <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={stats.clicksByDay}>
-                  <XAxis dataKey="day" tick={{ fontSize: 12 }} />
-                  <YAxis allowDecimals={false} tick={{ fontSize: 12 }} />
-                  <Tooltip />
-                  <Line type="monotone" dataKey="count" stroke="var(--color-primary, #2563eb)" strokeWidth={2} dot={false} />
+                <LineChart data={stats.clicksByDay} margin={{ top: 8, right: 12, bottom: 4, left: -8 }}>
+                  <CartesianGrid stroke="var(--border)" strokeDasharray="2 4" vertical={false} />
+                  <XAxis
+                    dataKey="day"
+                    tick={{ fontSize: 11, fontFamily: 'var(--font-mono)', fill: 'var(--slate)' }}
+                    stroke="var(--border)"
+                  />
+                  <YAxis
+                    allowDecimals={false}
+                    tick={{ fontSize: 11, fontFamily: 'var(--font-mono)', fill: 'var(--slate)' }}
+                    stroke="var(--border)"
+                  />
+                  <Tooltip
+                    contentStyle={{
+                      background: 'var(--card)',
+                      border: '1px solid var(--border)',
+                      borderRadius: 4,
+                      fontFamily: 'var(--font-mono)',
+                      fontSize: 12,
+                      color: 'var(--foreground)',
+                    }}
+                    labelStyle={{ color: 'var(--slate)' }}
+                    cursor={{ stroke: 'var(--ochre)', strokeWidth: 1, strokeDasharray: '3 3' }}
+                  />
+                  <Line
+                    type="monotone"
+                    dataKey="count"
+                    stroke="var(--chart-1)"
+                    strokeWidth={1.8}
+                    dot={{ r: 2.5, fill: 'var(--chart-1)', stroke: 'none' }}
+                    activeDot={{ r: 4, fill: 'var(--chart-1)', stroke: 'var(--card)', strokeWidth: 2 }}
+                  />
                 </LineChart>
               </ResponsiveContainer>
             </div>
           ) : (
-            <p className="text-sm text-muted-foreground">No click data yet.</p>
+            <p className="font-serif text-sm text-muted-foreground italic">No click data yet.</p>
           )}
         </CardContent>
       </Card>
@@ -173,16 +217,16 @@ export default function LinkDetail() {
           </CardHeader>
           <CardContent>
             {utmParams.length > 0 ? (
-              <ul className="flex flex-col gap-1 text-sm">
+              <ul className="flex flex-col text-sm">
                 {utmParams.map(([key, value]) => (
-                  <li key={key} className="flex justify-between border-b pb-1 last:border-0 last:pb-0">
-                    <span className="text-muted-foreground">{key}</span>
-                    <span className="font-medium">{value}</span>
+                  <li key={key} className="flex items-center justify-between gap-4 border-b border-border py-2 last:border-0">
+                    <span className="eyebrow-sm">{key}</span>
+                    <span className="mono truncate text-foreground">{value}</span>
                   </li>
                 ))}
               </ul>
             ) : (
-              <p className="text-sm text-muted-foreground">No UTM parameters set.</p>
+              <p className="font-serif text-sm text-muted-foreground italic">No UTM parameters set.</p>
             )}
           </CardContent>
         </Card>
@@ -193,19 +237,19 @@ export default function LinkDetail() {
           </CardHeader>
           <CardContent>
             {stats && stats.byCountry.length > 0 ? (
-              <ul className="flex flex-col gap-1 text-sm">
+              <ul className="flex flex-col text-sm">
                 {stats.byCountry.map((row) => (
                   <li
                     key={row.country}
-                    className="flex justify-between border-b pb-1 last:border-0 last:pb-0"
+                    className="flex items-center justify-between gap-4 border-b border-border py-2 last:border-0"
                   >
-                    <span className="text-muted-foreground">{row.country}</span>
-                    <span className="font-medium">{row.count}</span>
+                    <span className="mono text-muted-foreground">{row.country}</span>
+                    <span className="mono text-foreground">{row.count}</span>
                   </li>
                 ))}
               </ul>
             ) : (
-              <p className="text-sm text-muted-foreground">No click data yet.</p>
+              <p className="font-serif text-sm text-muted-foreground italic">No click data yet.</p>
             )}
           </CardContent>
         </Card>

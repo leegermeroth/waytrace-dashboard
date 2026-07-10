@@ -5,6 +5,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
 import { Alert, AlertDescription } from '@/components/ui/alert'
+import { PageHeader } from '@/components/brand'
 import {
   Table,
   TableBody,
@@ -177,10 +178,12 @@ export default function Clients() {
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold">Workspaces</h1>
-        <Button onClick={openCreate}>New workspace</Button>
-      </div>
+      <PageHeader
+        eyebrow="Team"
+        title="Workspaces"
+        description="Group links under a brand or client, each with its own short domain and approved values."
+        actions={<Button onClick={openCreate}>New workspace</Button>}
+      />
 
       {error && (
         <Alert variant="destructive">
@@ -189,7 +192,14 @@ export default function Clients() {
       )}
 
       {!isLoading && clients.length === 0 ? (
-        <p className="text-sm text-muted-foreground">No workspaces yet. Create one to get started.</p>
+        <div className="dot-grid-well rounded-xl border border-border p-10 text-center">
+          <p className="font-serif text-[15px] text-muted-foreground italic">
+            No workspaces yet. Create one to organize your campaign links.
+          </p>
+          <Button className="mt-4" onClick={openCreate}>
+            New workspace
+          </Button>
+        </div>
       ) : (
         <Table>
           <TableHeader>
@@ -205,12 +215,12 @@ export default function Clients() {
             {clients.map((client) => (
               <TableRow key={client.id}>
                 <TableCell className="font-medium">{client.name}</TableCell>
-                <TableCell className="text-muted-foreground">{client.slug}</TableCell>
-                <TableCell className="text-muted-foreground">
+                <TableCell className="mono text-xs text-muted-foreground">{client.slug}</TableCell>
+                <TableCell className="mono text-xs text-muted-foreground">
                   {client.short_domain || 'waygo.to'}
                 </TableCell>
                 <TableCell>
-                  <Badge variant={client.is_active ? 'default' : 'secondary'}>
+                  <Badge variant={client.is_active ? 'success' : 'outline'}>
                     {client.is_active ? 'Active' : 'Inactive'}
                   </Badge>
                 </TableCell>

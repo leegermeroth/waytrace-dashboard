@@ -5,6 +5,13 @@ import { listLinks, type Link } from '@/lib/api'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Alert, AlertDescription } from '@/components/ui/alert'
+import { PageHeader, StatCard } from '@/components/brand'
+
+const TIER_LABELS: Record<string, string> = {
+  free: 'Free',
+  pro: 'Professional',
+  agency: 'Team',
+}
 
 export default function Dashboard() {
   const { tier, subscriptionStatus } = useAuth()
@@ -22,13 +29,18 @@ export default function Dashboard() {
   const totalLinks = links.length
   const totalClicks = links.reduce((sum, l) => sum + l.clicks, 0)
   const topLinks = [...links].sort((a, b) => b.clicks - a.clicks).slice(0, 5)
+  const planLabel = tier ? TIER_LABELS[tier] ?? tier : '—'
 
   return (
-    <div className="flex flex-col gap-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold">Dashboard</h1>
-        <Button render={<RouterLink to="/dashboard/links/new" />}>New link</Button>
-      </div>
+    <div className="flex flex-col gap-8">
+      <PageHeader
+        eyebrow="Overview"
+        title="Home"
+        description="Your foundation at a glance — links, clicks, and plan."
+        actions={
+          <Button render={<RouterLink to="/dashboard/links/new" />}>New link</Button>
+        }
+      />
 
       {error && (
         <Alert variant="destructive">
@@ -37,25 +49,13 @@ export default function Dashboard() {
       )}
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-        <Card>
-          <CardHeader>
-            <CardDescription>Total links</CardDescription>
-            <CardTitle className="text-3xl">{isLoading ? '—' : totalLinks}</CardTitle>
-          </CardHeader>
-        </Card>
-        <Card>
-          <CardHeader>
-            <CardDescription>Total clicks</CardDescription>
-            <CardTitle className="text-3xl">{isLoading ? '—' : totalClicks}</CardTitle>
-          </CardHeader>
-        </Card>
-        <Card>
-          <CardHeader>
-            <CardDescription>Plan</CardDescription>
-            <CardTitle className="text-3xl capitalize">{tier ?? '—'}</CardTitle>
-            <CardDescription className="capitalize">{subscriptionStatus}</CardDescription>
-          </CardHeader>
-        </Card>
+        <StatCard label="Total links" value={isLoading ? '—' : totalLinks} reference />
+        <StatCard label="Total clicks" value={isLoading ? '—' : totalClicks} />
+        <StatCard
+          label="Plan"
+          value={planLabel}
+          hint={<span className="capitalize">{subscriptionStatus}</span>}
+        />
       </div>
 
       <Card>
@@ -65,21 +65,30 @@ export default function Dashboard() {
         </CardHeader>
         <CardContent>
           {!isLoading && topLinks.length === 0 ? (
-            <p className="text-sm text-muted-foreground">
+            <p className="font-serif text-[15px] text-muted-foreground italic">
               No links yet.{' '}
-              <RouterLink to="/dashboard/links/new" className="underline">
+              <RouterLink
+                to="/dashboard/links/new"
+                className="font-sans text-ochre not-italic hover:text-ochre-hover hover:underline"
+              >
                 Create your first link
-              </RouterLink>
-              .
+              </RouterLink>{' '}
+              to start building your foundation.
             </p>
           ) : (
-            <ul className="flex flex-col gap-2">
+            <ul className="flex flex-col">
               {topLinks.map((link) => (
-                <li key={link.id} className="flex items-center justify-between border-b pb-2 text-sm last:border-0 last:pb-0">
-                  <RouterLink to={`/dashboard/links/${link.id}`} className="hover:underline">
+                <li
+                  key={link.id}
+                  className="flex items-center justify-between border-b border-border py-2.5 text-sm last:border-0"
+                >
+                  <RouterLink
+                    to={`/dashboard/links/${link.id}`}
+                    className="font-medium hover:text-ochre"
+                  >
                     {link.label || link.short_code}
                   </RouterLink>
-                  <span className="font-medium">{link.clicks} clicks</span>
+                  <span className="mono text-muted-foreground">{link.clicks} clicks</span>
                 </li>
               ))}
             </ul>

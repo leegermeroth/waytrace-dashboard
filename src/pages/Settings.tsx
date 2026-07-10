@@ -6,6 +6,7 @@ import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Alert, AlertDescription } from '@/components/ui/alert'
+import { PageHeader } from '@/components/brand'
 
 export default function Settings() {
   const [me, setMe] = useState<Me | null>(null)
@@ -80,7 +81,7 @@ export default function Settings() {
 
   return (
     <div className="flex flex-col gap-6">
-      <h1 className="text-2xl font-semibold">Settings</h1>
+      <PageHeader eyebrow="Account" title="Settings" />
 
       {error && (
         <Alert variant="destructive">
@@ -93,27 +94,27 @@ export default function Settings() {
           <CardTitle>Account</CardTitle>
         </CardHeader>
         <CardContent className="flex flex-col gap-4">
-          <div className="flex flex-col gap-1">
-            <span className="text-sm text-muted-foreground">Name</span>
+          <div className="flex flex-col gap-1.5">
+            <span className="eyebrow-sm">Name</span>
             <span>{me?.name ?? '—'}</span>
           </div>
           {isInvitedUser && (
             <>
-              <div className="flex flex-col gap-1">
-                <span className="text-sm text-muted-foreground">Email</span>
-                <span>{me?.email ?? '—'}</span>
+              <div className="flex flex-col gap-1.5">
+                <span className="eyebrow-sm">Email</span>
+                <span className="mono text-sm">{me?.email ?? '—'}</span>
               </div>
-              <div className="flex flex-col gap-1">
-                <span className="text-sm text-muted-foreground">Role</span>
-                <Badge variant="default" className="w-fit capitalize">
+              <div className="flex flex-col gap-1.5">
+                <span className="eyebrow-sm">Role</span>
+                <Badge variant="default" className="w-fit">
                   {me?.role ?? '—'}
                 </Badge>
               </div>
             </>
           )}
-          <div className="flex flex-col gap-1">
-            <span className="text-sm text-muted-foreground">Plan</span>
-            <Badge variant={me?.tier === 'free' ? 'secondary' : 'default'} className="w-fit capitalize">
+          <div className="flex flex-col gap-1.5">
+            <span className="eyebrow-sm">Plan</span>
+            <Badge variant={me?.tier === 'free' ? 'secondary' : 'default'} className="w-fit">
               {me?.tier ?? '—'}
             </Badge>
           </div>

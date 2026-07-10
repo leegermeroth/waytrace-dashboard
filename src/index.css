@@ -1,13 +1,31 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
-@import "@fontsource-variable/geist";
+
+/* ── Brand typefaces ────────────────────────────────────────────
+   Archivo  → headings & UI          (weights 400/500/600)
+   IBM Plex Mono → labels, eyebrows, data, UTM/technical strings
+   Spectral → editorial accents / taglines / empty states (italic) */
+@import "@fontsource-variable/archivo/wght.css";
+@import "@fontsource-variable/archivo/wght-italic.css";
+@import "@fontsource/ibm-plex-mono/400.css";
+@import "@fontsource/ibm-plex-mono/500.css";
+@import "@fontsource/ibm-plex-mono/600.css";
+@import "@fontsource/spectral/400.css";
+@import "@fontsource/spectral/500.css";
+@import "@fontsource/spectral/400-italic.css";
+@import "@fontsource/spectral/500-italic.css";
 
 @custom-variant dark (&:is(.dark *));
 
 @theme inline {
-    --font-heading: var(--font-sans);
-    --font-sans: 'Geist Variable', sans-serif;
+    /* Type — three faces, each with one job */
+    --font-sans: 'Archivo Variable', 'Archivo', system-ui, sans-serif;
+    --font-heading: 'Archivo Variable', 'Archivo', system-ui, sans-serif;
+    --font-mono: 'IBM Plex Mono', ui-monospace, monospace;
+    --font-serif: 'Spectral', Georgia, serif;
+
+    /* shadcn semantic tokens → CSS variables (defined in :root / .dark) */
     --color-sidebar-ring: var(--sidebar-ring);
     --color-sidebar-border: var(--sidebar-border);
     --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
@@ -39,92 +57,193 @@
     --color-card: var(--card);
     --color-foreground: var(--foreground);
     --color-background: var(--background);
-    --radius-sm: calc(var(--radius) * 0.6);
-    --radius-md: calc(var(--radius) * 0.8);
+
+    /* Brand named colors — usable as bg-ochre / text-ochre / border-ochre etc.
+       Ochre is the reference color: primary action / the single trusted point.
+       Use it sparingly — never decoratively. */
+    --color-ochre: var(--ochre);
+    --color-ochre-hover: var(--ochre-hover);
+    --color-ochre-dark: var(--ochre-dark);
+    --color-graphite: var(--graphite);
+    --color-paper: var(--paper);
+    --color-cast: var(--cast);
+    --color-slate: var(--slate);
+    --color-slate-light: var(--slate-light);
+    --color-success: var(--success);
+    --color-warning: var(--warning);
+    --color-danger: var(--danger);
+
+    /* Radius — square-ish, quiet. Never above 8px, no bubbly corners.
+       base 4px → buttons/inputs use radius-lg, cards use radius-xl (~6px). */
+    --radius-sm: calc(var(--radius) - 1px);
+    --radius-md: var(--radius);
     --radius-lg: var(--radius);
-    --radius-xl: calc(var(--radius) * 1.4);
-    --radius-2xl: calc(var(--radius) * 1.8);
-    --radius-3xl: calc(var(--radius) * 2.2);
-    --radius-4xl: calc(var(--radius) * 2.6);
+    --radius-xl: calc(var(--radius) + 2px);
+    --radius-2xl: calc(var(--radius) + 4px);
+    --radius-3xl: calc(var(--radius) + 8px);
+    --radius-4xl: 9999px;
 }
 
 :root {
-    --background: oklch(1 0 0);
-    --foreground: oklch(0.145 0 0);
-    --card: oklch(1 0 0);
-    --card-foreground: oklch(0.145 0 0);
-    --popover: oklch(1 0 0);
-    --popover-foreground: oklch(0.145 0 0);
-    --primary: oklch(0.205 0 0);
-    --primary-foreground: oklch(0.985 0 0);
-    --secondary: oklch(0.97 0 0);
-    --secondary-foreground: oklch(0.205 0 0);
-    --muted: oklch(0.97 0 0);
-    --muted-foreground: oklch(0.556 0 0);
-    --accent: oklch(0.97 0 0);
-    --accent-foreground: oklch(0.205 0 0);
-    --destructive: oklch(0.577 0.245 27.325);
-    --border: oklch(0.922 0 0);
-    --input: oklch(0.922 0 0);
-    --ring: oklch(0.708 0 0);
-    --chart-1: oklch(0.87 0 0);
-    --chart-2: oklch(0.556 0 0);
-    --chart-3: oklch(0.439 0 0);
-    --chart-4: oklch(0.371 0 0);
-    --chart-5: oklch(0.269 0 0);
-    --radius: 0.625rem;
-    --sidebar: oklch(0.985 0 0);
-    --sidebar-foreground: oklch(0.145 0 0);
-    --sidebar-primary: oklch(0.205 0 0);
-    --sidebar-primary-foreground: oklch(0.985 0 0);
-    --sidebar-accent: oklch(0.97 0 0);
-    --sidebar-accent-foreground: oklch(0.205 0 0);
-    --sidebar-border: oklch(0.922 0 0);
-    --sidebar-ring: oklch(0.708 0 0);
+    --radius: 0.25rem; /* 4px */
+
+    /* Warm-neutral surfaces */
+    --background: #E8E2D5;        /* Paper — page background */
+    --foreground: #2C2820;        /* Graphite — primary text */
+    --card: #F4F0E6;              /* Card surface */
+    --card-foreground: #2C2820;
+    --popover: #F4F0E6;
+    --popover-foreground: #2C2820;
+
+    /* Primary is always graphite fill, never ochre. */
+    --primary: #2C2820;
+    --primary-foreground: #F4F0E6;
+
+    --secondary: #EFEADE;         /* subtle alternate surface */
+    --secondary-foreground: #2C2820;
+    --muted: #EFEADE;             /* muted well / alt rows */
+    --muted-foreground: #6C6353;  /* slate — secondary text */
+    --accent: #E4DCCB;            /* hover surface */
+    --accent-foreground: #2C2820;
+
+    --destructive: #B3543F;       /* error */
+    --border: #D6CEBC;
+    --input: #D6CEBC;
+    --ring: #A8772E;              /* focus = ochre */
+
+    /* Charts — "reference point" grammar: ochre = the selected/baseline,
+       graphite + slates = everything being compared to it. */
+    --chart-1: #A8772E;           /* ochre — reference */
+    --chart-2: #2C2820;           /* graphite */
+    --chart-3: #7C7568;           /* slate */
+    --chart-4: #C79A4E;           /* ochre light */
+    --chart-5: #9A917E;           /* slate light */
+
+    --sidebar: #F4F0E6;
+    --sidebar-foreground: #2C2820;
+    --sidebar-primary: #2C2820;
+    --sidebar-primary-foreground: #F4F0E6;
+    --sidebar-accent: #E4DCCB;
+    --sidebar-accent-foreground: #2C2820;
+    --sidebar-border: #D6CEBC;
+    --sidebar-ring: #A8772E;
+
+    /* Brand named palette */
+    --ochre: #A8772E;
+    --ochre-hover: #8A6222;
+    --ochre-dark: #C79A4E;        /* ochre on dark surfaces */
+    --graphite: #2C2820;
+    --paper: #E8E2D5;
+    --cast: #FBF8F0;              /* inputs, wells */
+    --slate: #7C7568;
+    --slate-light: #9A917E;
+    --success: #6B8F71;
+    --warning: #C79A4E;
+    --danger: #B3543F;
 }
 
+/* Dark mode — Graphite is the brand's own "dark section" color from the
+   marketing site, reused here as the literal dark background. */
 .dark {
-    --background: oklch(0.145 0 0);
-    --foreground: oklch(0.985 0 0);
-    --card: oklch(0.205 0 0);
-    --card-foreground: oklch(0.985 0 0);
-    --popover: oklch(0.205 0 0);
-    --popover-foreground: oklch(0.985 0 0);
-    --primary: oklch(0.922 0 0);
-    --primary-foreground: oklch(0.205 0 0);
-    --secondary: oklch(0.269 0 0);
-    --secondary-foreground: oklch(0.985 0 0);
-    --muted: oklch(0.269 0 0);
-    --muted-foreground: oklch(0.708 0 0);
-    --accent: oklch(0.269 0 0);
-    --accent-foreground: oklch(0.985 0 0);
-    --destructive: oklch(0.704 0.191 22.216);
-    --border: oklch(1 0 0 / 10%);
-    --input: oklch(1 0 0 / 15%);
-    --ring: oklch(0.556 0 0);
-    --chart-1: oklch(0.87 0 0);
-    --chart-2: oklch(0.556 0 0);
-    --chart-3: oklch(0.439 0 0);
-    --chart-4: oklch(0.371 0 0);
-    --chart-5: oklch(0.269 0 0);
-    --sidebar: oklch(0.205 0 0);
-    --sidebar-foreground: oklch(0.985 0 0);
-    --sidebar-primary: oklch(0.488 0.243 264.376);
-    --sidebar-primary-foreground: oklch(0.985 0 0);
-    --sidebar-accent: oklch(0.269 0 0);
-    --sidebar-accent-foreground: oklch(0.985 0 0);
-    --sidebar-border: oklch(1 0 0 / 10%);
-    --sidebar-ring: oklch(0.556 0 0);
+    --background: #2C2820;
+    --foreground: #F4F0E6;
+    --card: #34301F;
+    --card-foreground: #F4F0E6;
+    --popover: #34301F;
+    --popover-foreground: #F4F0E6;
+
+    --primary: #F4F0E6;
+    --primary-foreground: #2C2820;
+
+    --secondary: #3B3628;
+    --secondary-foreground: #F4F0E6;
+    --muted: #3B3628;
+    --muted-foreground: #C4BBA7;
+    --accent: #443E2D;
+    --accent-foreground: #F4F0E6;
+
+    --destructive: #C56B54;
+    --border: rgba(244, 240, 230, 0.14);
+    --input: rgba(244, 240, 230, 0.20);
+    --ring: #C79A4E;
+
+    --chart-1: #C79A4E;
+    --chart-2: #C4BBA7;
+    --chart-3: #9A917E;
+    --chart-4: #A8772E;
+    --chart-5: #E8DFCB;
+
+    --sidebar: #34301F;
+    --sidebar-foreground: #F4F0E6;
+    --sidebar-primary: #F4F0E6;
+    --sidebar-primary-foreground: #2C2820;
+    --sidebar-accent: #443E2D;
+    --sidebar-accent-foreground: #F4F0E6;
+    --sidebar-border: rgba(244, 240, 230, 0.14);
+    --sidebar-ring: #C79A4E;
+
+    --ochre: #C79A4E;
+    --ochre-hover: #A8772E;
+    --ochre-dark: #C79A4E;
+    --cast: #2E2A1D;
 }
 
 @layer base {
   * {
     @apply border-border outline-ring/50;
-    }
+  }
   body {
     @apply bg-background text-foreground;
-    }
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
   html {
     @apply font-sans;
-    }
+  }
+  ::selection {
+    background: var(--ochre);
+    color: var(--paper);
+  }
+  code {
+    font-family: var(--font-mono);
+    font-size: 0.9em;
+  }
+}
+
+@layer components {
+  /* Mono uppercase eyebrow / field label — the "measurement" label voice. */
+  .eyebrow {
+    font-family: var(--font-mono);
+    font-size: 0.6875rem;      /* 11px */
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--slate);
+    line-height: 1.5;
+  }
+  .eyebrow-sm {
+    font-family: var(--font-mono);
+    font-size: 0.625rem;       /* 10px */
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--slate-light);
+    line-height: 1.5;
+  }
+  /* Data / numeric / UTM strings — always Plex Mono for scannability. */
+  .mono {
+    font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* Dot-grid measurement substrate — signals "this is a measurement surface". */
+  .dot-grid {
+    background-image: radial-gradient(circle, rgba(44, 40, 32, 0.07) 1px, transparent 1.3px);
+    background-size: 32px 32px;
+  }
+  .dark .dot-grid {
+    background-image: radial-gradient(circle, rgba(244, 240, 230, 0.06) 1px, transparent 1.3px);
+  }
+  .dot-grid-well {
+    background-image: radial-gradient(circle, #ECE5D6 1px, transparent 1.3px);
+    background-size: 30px 30px;
+  }
 }

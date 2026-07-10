@@ -14,6 +14,7 @@ import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { PageHeader } from '@/components/brand'
 import {
   Table,
   TableBody,
@@ -131,12 +132,11 @@ export default function Users() {
 
   return (
     <div className="flex flex-col gap-6">
-      <div>
-        <h1 className="text-2xl font-semibold">Users</h1>
-        <p className="text-sm text-muted-foreground">
-          Invite teammates and manage their access. Team plan allows up to 5 users, including you.
-        </p>
-      </div>
+      <PageHeader
+        eyebrow="Team"
+        title="Users"
+        description="Invite teammates and manage their access. Team plan allows up to 5 users, including you."
+      />
 
       {loadError && (
         <Alert variant="destructive">
@@ -227,21 +227,21 @@ export default function Users() {
           {me && (
             <TableRow>
               <TableCell className="font-medium">{me.name || '—'}</TableCell>
-              <TableCell className="text-muted-foreground">{me.email ?? '—'}</TableCell>
+              <TableCell className="mono text-xs text-muted-foreground">{me.email ?? '—'}</TableCell>
               <TableCell>
-                <Badge>Owner</Badge>
+                <Badge variant="ochre">Owner</Badge>
               </TableCell>
               <TableCell>
-                <Badge variant="default">Active</Badge>
+                <Badge variant="success">Active</Badge>
               </TableCell>
-              <TableCell className="text-right text-sm text-muted-foreground">You</TableCell>
+              <TableCell className="eyebrow-sm text-right">You</TableCell>
             </TableRow>
           )}
 
           {users.map((user) => (
             <TableRow key={user.id}>
               <TableCell className="font-medium">{user.name || '—'}</TableCell>
-              <TableCell className="text-muted-foreground">{user.email}</TableCell>
+              <TableCell className="mono text-xs text-muted-foreground">{user.email}</TableCell>
               <TableCell>
                 <Select
                   value={user.role}
@@ -258,11 +258,11 @@ export default function Users() {
               </TableCell>
               <TableCell>
                 <div className="flex flex-col gap-1">
-                  <Badge variant={user.status === 'active' ? 'default' : 'secondary'} className="w-fit">
+                  <Badge variant={user.status === 'active' ? 'success' : 'outline'} className="w-fit">
                     {user.status === 'active' ? 'Active' : 'Invited'}
                   </Badge>
                   {!user.is_active && (
-                    <Badge variant="secondary" className="w-fit">
+                    <Badge variant="warning" className="w-fit">
                       Disabled
                     </Badge>
                   )}
@@ -293,7 +293,7 @@ export default function Users() {
 
           {!isLoading && users.length === 0 && !me && (
             <TableRow>
-              <TableCell colSpan={5} className="text-sm text-muted-foreground">
+              <TableCell colSpan={5} className="font-serif text-sm text-muted-foreground italic">
                 No teammates yet. Invite someone above to get started.
               </TableCell>
             </TableRow>
@@ -302,7 +302,7 @@ export default function Users() {
       </Table>
 
       {!isLoading && users.length === 0 && me && (
-        <p className="text-sm text-muted-foreground">
+        <p className="font-serif text-sm text-muted-foreground italic">
           No teammates yet. Invite someone above to get started.
         </p>
       )}
