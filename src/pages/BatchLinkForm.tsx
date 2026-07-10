@@ -23,7 +23,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { buildTrackingUrl, normalizeDestinationUrl, runWithConcurrency, shortUrl } from '@/lib/links'
+import { buildTrackingUrl, normalizeDestinationUrl, runWithConcurrency, scanUrl, shortUrl } from '@/lib/links'
 
 interface Row {
   key: number
@@ -54,7 +54,6 @@ export default function BatchLinkForm() {
   const [clients, setClients] = useState<Client[]>([])
   const [clientId, setClientId] = useState<string>('')
   const [campaign, setCampaign] = useState('')
-  const [linkType, setLinkType] = useState('short')
   const [rows, setRows] = useState<Row[]>([emptyRow()])
 
   const [isLoading, setIsLoading] = useState(true)
@@ -132,7 +131,6 @@ export default function BatchLinkForm() {
           utm_source: row.source.trim() || undefined,
           utm_medium: row.medium.trim() || undefined,
           utm_campaign: campaign.trim() || undefined,
-          link_type: linkType,
         })
       )
       setResults(
@@ -245,7 +243,7 @@ export default function BatchLinkForm() {
                         variant="ghost"
                         size="sm"
                         onClick={() => {
-                          setQrUrl(shortUrl(r.link!))
+                          setQrUrl(scanUrl(r.link!))
                           setQrLabel(r.link!.label || r.link!.short_code)
                         }}
                       >
@@ -328,18 +326,6 @@ export default function BatchLinkForm() {
               onChange={(e) => setCampaign(e.target.value)}
               placeholder="summer-2026"
             />
-          </div>
-          <div className="flex flex-col gap-2 sm:w-40">
-            <Label>Link type</Label>
-            <Select value={linkType} onValueChange={(v) => setLinkType(v ?? 'short')}>
-              <SelectTrigger className="w-full">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="short">Short link</SelectItem>
-                <SelectItem value="qr">QR code</SelectItem>
-              </SelectContent>
-            </Select>
           </div>
         </CardContent>
       </Card>

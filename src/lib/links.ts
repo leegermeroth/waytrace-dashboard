@@ -7,6 +7,15 @@ export function shortUrl(link: Pick<Link, 'short_code' | 'short_domain'>): strin
 }
 
 /**
+ * The URL a QR code should encode: the short URL plus a `?qr=1` marker. The
+ * Worker's redirect handler records hits on this URL as *scans* rather than
+ * *clicks*, so QR engagement is tracked separately from link clicks.
+ */
+export function scanUrl(link: Pick<Link, 'short_code' | 'short_domain'>): string {
+  return `${shortUrl(link)}?qr=1`
+}
+
+/**
  * Prepend `https://` to a destination that was typed without a scheme, so
  * "example.com/page" is accepted instead of bounced by the Worker's http(s)
  * validation. Leaves an empty string, an existing http(s):// URL, or any other

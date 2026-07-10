@@ -16,7 +16,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { PageHeader } from '@/components/brand'
 import { QrDialog } from '@/components/QrDialog'
-import { buildTrackingUrl, shortUrl } from '@/lib/links'
+import { buildTrackingUrl, scanUrl, shortUrl } from '@/lib/links'
 
 /**
  * The Worker only started rejecting non-http(s) destination_url values
@@ -186,8 +186,12 @@ export default function LinkDetail() {
           </div>
           <div className="flex gap-8">
             <div className="flex flex-col gap-1">
-              <span className="eyebrow-sm">Total clicks</span>
+              <span className="eyebrow-sm">Link clicks</span>
               <span className="mono text-foreground">{link.clicks}</span>
+            </div>
+            <div className="flex flex-col gap-1">
+              <span className="eyebrow-sm">QR scans</span>
+              <span className="mono text-foreground">{link.scans}</span>
             </div>
             <div className="flex flex-col gap-1">
               <span className="eyebrow-sm">Created</span>
@@ -201,8 +205,8 @@ export default function LinkDetail() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Clicks over time</CardTitle>
-          <CardDescription>Last 30 days</CardDescription>
+          <CardTitle>Activity over time</CardTitle>
+          <CardDescription>Clicks and scans, last 30 days</CardDescription>
         </CardHeader>
         <CardContent>
           {stats && stats.clicksByDay.length > 0 ? (
@@ -318,7 +322,7 @@ export default function LinkDetail() {
       <QrDialog
         open={qrOpen}
         onOpenChange={setQrOpen}
-        url={shortUrl(link)}
+        url={scanUrl(link)}
         label={link.label || link.short_code}
       />
     </div>

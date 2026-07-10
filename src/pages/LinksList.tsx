@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { PageHeader, StatusDot } from '@/components/brand'
 import { QrDialog } from '@/components/QrDialog'
-import { buildTrackingUrl, shortUrl } from '@/lib/links'
+import { buildTrackingUrl, scanUrl, shortUrl } from '@/lib/links'
 import {
   Table,
   TableBody,
@@ -24,9 +24,8 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 
-type SortKey = 'label' | 'clicks' | 'created_at'
+type SortKey = 'label' | 'clicks' | 'scans' | 'created_at'
 type StatusFilter = 'all' | 'active' | 'inactive'
-type TypeFilter = 'all' | 'short' | 'qr'
 
 /** A quiet toggle chip for the boolean quick-filters. */
 function FilterChip({
@@ -65,7 +64,6 @@ export default function LinksList() {
   const [mediumFilter, setMediumFilter] = useState<string>('all')
   const [campaignFilter, setCampaignFilter] = useState<string>('all')
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all')
-  const [typeFilter, setTypeFilter] = useState<TypeFilter>('all')
 
   const [sortKey, setSortKey] = useState<SortKey>('created_at')
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc')
@@ -110,8 +108,6 @@ export default function LinksList() {
       if (campaignFilter !== 'all' && (l.utm_campaign || '') !== campaignFilter) return false
       if (statusFilter === 'active' && !l.is_active) return false
       if (statusFilter === 'inactive' && l.is_active) return false
-      if (typeFilter === 'qr' && l.link_type !== 'qr') return false
-      if (typeFilter === 'short' && l.link_type === 'qr') return false
       if (q) {
         const hay = [
           l.label,
@@ -137,6 +133,8 @@ export default function LinksList() {
         cmp = (a.label || a.short_code).localeCompare(b.label || b.short_code)
       } else if (sortKey === 'clicks') {
         cmp = a.clicks - b.clicks
+      } else if (sortKey === 'scans') {
+        cmp = a.scans - b.scans
       } else {
         cmp = new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
       }
@@ -151,7 +149,6 @@ export default function LinksList() {
     mediumFilter,
     campaignFilter,
     statusFilter,
-    typeFilter,
     sortKey,
     sortDir,
   ])
@@ -162,8 +159,7 @@ export default function LinksList() {
     sourceFilter !== 'all' ||
     mediumFilter !== 'all' ||
     campaignFilter !== 'all' ||
-    statusFilter !== 'all' ||
-    typeFilter !== 'all'
+    statusFilter !== 'all'
 
   function clearFilters() {
     setSearch('')
@@ -172,7 +168,6 @@ export default function LinksList() {
     setMediumFilter('all')
     setCampaignFilter('all')
     setStatusFilter('all')
-    setTypeFilter('all')
   }
 
   function toggleSort(key: SortKey) {
@@ -303,18 +298,6 @@ export default function LinksList() {
           >
             Inactive
           </FilterChip>
-          <FilterChip
-            active={typeFilter === 'short'}
-            onClick={() => setTypeFilter((t) => (t === 'short' ? 'all' : 'short'))}
-          >
-            Has short link
-          </FilterChip>
-          <FilterChip
-            active={typeFilter === 'qr'}
-            onClick={() => setTypeFilter((t) => (t === 'qr' ? 'all' : 'qr'))}
-          >
-            Has QR
-          </FilterChip>
           {hasActiveFilters && (
             <button
               onClick={clearFilters}
@@ -359,6 +342,9 @@ export default function LinksList() {
                 <TableHead className="cursor-pointer" onClick={() => toggleSort('clicks')}>
                   Clicks
                 </TableHead>
+                <TableHead className="cursor-pointer" onClick={() => toggleSort('scans')}>
+                  Scans
+                </TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead className="text-right">Actions</TableHead>
               </TableRow>
@@ -399,6 +385,7 @@ export default function LinksList() {
                     <ValueCell value={link.utm_campaign} onClick={(v) => setCampaignFilter(v)} />
                   </TableCell>
                   <TableCell className="mono">{link.clicks}</TableCell>
+                  <TableCell className="mono">{link.scans}</TableCell>
                   <TableCell>
                     <StatusDot tone={link.is_active ? 'success' : 'neutral'}>
                       {link.is_active ? 'Active' : 'Inactive'}
@@ -425,7 +412,7 @@ export default function LinksList() {
                         title="QR code"
                         aria-label="QR code"
                         onClick={() => {
-                          setQrUrl(shortUrl(link))
+                          setQrUrl(scanUrl(link))
                           setQrLabel(link.label || link.short_code)
                         }}
                       >

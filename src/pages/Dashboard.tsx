@@ -28,6 +28,7 @@ export default function Dashboard() {
 
   const totalLinks = links.length
   const totalClicks = links.reduce((sum, l) => sum + l.clicks, 0)
+  const totalScans = links.reduce((sum, l) => sum + l.scans, 0)
   const topLinks = [...links].sort((a, b) => b.clicks - a.clicks).slice(0, 5)
   const planLabel = tier ? TIER_LABELS[tier] ?? tier : '—'
 
@@ -48,9 +49,10 @@ export default function Dashboard() {
         </Alert>
       )}
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+      <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
         <StatCard label="Total links" value={isLoading ? '—' : totalLinks} reference />
-        <StatCard label="Total clicks" value={isLoading ? '—' : totalClicks} />
+        <StatCard label="Link clicks" value={isLoading ? '—' : totalClicks} />
+        <StatCard label="QR scans" value={isLoading ? '—' : totalScans} />
         <StatCard
           label="Plan"
           value={planLabel}

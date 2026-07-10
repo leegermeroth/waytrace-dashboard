@@ -40,7 +40,6 @@ function EditLinkForm({ id }: { id: string }) {
   const [clientId, setClientId] = useState<string>('')
   const [destinationUrl, setDestinationUrl] = useState('')
   const [label, setLabel] = useState('')
-  const [linkType, setLinkType] = useState('short')
   const [utmSource, setUtmSource] = useState('')
   const [utmMedium, setUtmMedium] = useState('')
   const [utmCampaign, setUtmCampaign] = useState('')
@@ -79,7 +78,6 @@ function EditLinkForm({ id }: { id: string }) {
     setClientId(String(link.client_id))
     setDestinationUrl(link.destination_url)
     setLabel(link.label ?? '')
-    setLinkType(link.link_type)
     setUtmSource(link.utm_source ?? '')
     setUtmMedium(link.utm_medium ?? '')
     setUtmCampaign(link.utm_campaign ?? '')
@@ -102,7 +100,6 @@ function EditLinkForm({ id }: { id: string }) {
         utm_campaign: utmCampaign || undefined,
         utm_term: utmTerm || undefined,
         utm_content: utmContent || undefined,
-        link_type: linkType,
       })
       navigate(`/dashboard/links/${id}`)
     } catch (err) {
@@ -178,19 +175,6 @@ function EditLinkForm({ id }: { id: string }) {
                 onChange={(e) => setLabel(e.target.value)}
                 placeholder="Spring campaign"
               />
-            </div>
-
-            <div className="flex flex-col gap-2">
-              <Label>Link type</Label>
-              <Select value={linkType} onValueChange={(v) => setLinkType(v ?? 'short')}>
-                <SelectTrigger className="w-full">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="short">Short link</SelectItem>
-                  <SelectItem value="qr">QR code</SelectItem>
-                </SelectContent>
-              </Select>
             </div>
 
             <div className="grid grid-cols-2 gap-4">

@@ -123,6 +123,7 @@ export interface Link {
   link_type: string
   is_active: number
   clicks: number
+  scans: number
   created_at: string
   updated_at: string
   client_name?: string
@@ -145,7 +146,7 @@ export interface LinkInput {
 }
 
 export interface LinkStats {
-  link: { id: number; label: string | null; short_code: string; clicks: number }
+  link: { id: number; label: string | null; short_code: string; clicks: number; scans: number }
   clicksByDay: { day: string; count: number }[]
   byCountry: { country: string; count: number }[]
   byDevice: { device_type: string; count: number }[]
