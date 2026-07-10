@@ -21,6 +21,9 @@ const buttonVariants = cva(
           "border-ochre font-mono text-[0.72rem] tracking-[0.08em] uppercase text-ochre hover:bg-ochre hover:text-paper",
         destructive:
           "bg-destructive/10 text-destructive hover:bg-destructive/20 focus-visible:border-destructive/40 focus-visible:ring-destructive/20",
+        // Quiet destructive — muted until hover, so it doesn't shout on every row.
+        "destructive-ghost":
+          "text-muted-foreground hover:bg-destructive/10 hover:text-destructive focus-visible:ring-destructive/20",
         "destructive-solid":
           "bg-destructive text-paper hover:bg-destructive/90 focus-visible:border-destructive/40 focus-visible:ring-destructive/20",
         link: "text-ochre underline-offset-4 hover:text-ochre-hover hover:underline",

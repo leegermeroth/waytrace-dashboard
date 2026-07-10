@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link as RouterLink } from 'react-router-dom'
+import { Check, Copy } from 'lucide-react'
 import { deleteLink, listClients, listLinks, type Client, type Link } from '@/lib/api'
 import { Button } from '@/components/ui/button'
-import { Badge } from '@/components/ui/badge'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { PageHeader } from '@/components/brand'
 import {
@@ -136,64 +136,81 @@ export default function LinksList() {
           </Button>
         </div>
       ) : (
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead className="cursor-pointer" onClick={() => toggleSort('label')}>
-                Label
-              </TableHead>
-              <TableHead>Short URL</TableHead>
-              <TableHead>Destination</TableHead>
-              <TableHead className="cursor-pointer" onClick={() => toggleSort('clicks')}>
-                Clicks
-              </TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead className="text-right">Actions</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {filtered.map((link) => (
-              <TableRow key={link.id}>
-                <TableCell>
-                  <RouterLink to={`/dashboard/links/${link.id}`} className="font-medium hover:text-ochre">
-                    {link.label || link.short_code}
-                  </RouterLink>
-                </TableCell>
-                <TableCell>
-                  <button
-                    onClick={() => handleCopy(link)}
-                    className="mono text-xs text-muted-foreground hover:text-ochre"
-                  >
-                    {copiedId === link.id ? 'Copied ✓' : shortUrl(link).replace('https://', '')}
-                  </button>
-                </TableCell>
-                <TableCell className="mono max-w-64 truncate text-xs text-muted-foreground">
-                  {link.destination_url}
-                </TableCell>
-                <TableCell className="mono">{link.clicks}</TableCell>
-                <TableCell>
-                  <Badge variant={link.is_active ? 'success' : 'outline'}>
-                    {link.is_active ? 'Active' : 'Inactive'}
-                  </Badge>
-                </TableCell>
-                <TableCell className="text-right">
-                  <div className="flex justify-end gap-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      render={<RouterLink to={`/dashboard/links/${link.id}/edit`} />}
-                    >
-                      Edit
-                    </Button>
-                    <Button variant="destructive" size="sm" onClick={() => handleDelete(link)}>
-                      Delete
-                    </Button>
-                  </div>
-                </TableCell>
+        <div className="overflow-hidden rounded-xl border border-border bg-card">
+          <Table className="[&_td]:py-2 [&_th]:h-9">
+            <TableHeader>
+              <TableRow>
+                <TableHead className="cursor-pointer" onClick={() => toggleSort('label')}>
+                  Label
+                </TableHead>
+                <TableHead>Short URL</TableHead>
+                <TableHead>Destination</TableHead>
+                <TableHead className="cursor-pointer" onClick={() => toggleSort('clicks')}>
+                  Clicks
+                </TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead className="text-right">Actions</TableHead>
               </TableRow>
-            ))}
-          </TableBody>
-        </Table>
+            </TableHeader>
+            <TableBody>
+              {filtered.map((link) => (
+                <TableRow key={link.id}>
+                  <TableCell>
+                    <RouterLink to={`/dashboard/links/${link.id}`} className="font-medium hover:text-ochre">
+                      {link.label || link.short_code}
+                    </RouterLink>
+                  </TableCell>
+                  <TableCell>
+                    <span className="group/copy relative inline-flex">
+                      <button
+                        onClick={() => handleCopy(link)}
+                        aria-label="Copy short link"
+                        className="mono inline-flex items-center gap-1.5 text-xs text-muted-foreground transition-colors hover:text-ochre"
+                      >
+                        {shortUrl(link).replace('https://', '')}
+                        {copiedId === link.id ? (
+                          <Check className="size-3.5 text-success" />
+                        ) : (
+                          <Copy className="size-3.5 opacity-50 transition-opacity group-hover/copy:opacity-100" />
+                        )}
+                      </button>
+                      <span className="pointer-events-none absolute -top-7 left-0 z-10 rounded-[3px] bg-graphite px-2 py-1 font-mono text-[9px] tracking-[0.1em] whitespace-nowrap text-paper uppercase opacity-0 transition-opacity group-hover/copy:opacity-100">
+                        {copiedId === link.id ? 'Copied' : 'Click to copy'}
+                      </span>
+                    </span>
+                  </TableCell>
+                  <TableCell className="mono max-w-64 truncate text-xs text-muted-foreground">
+                    {link.destination_url}
+                  </TableCell>
+                  <TableCell className="mono">{link.clicks}</TableCell>
+                  <TableCell>
+                    <span className="inline-flex items-center gap-1.5 font-mono text-[0.625rem] tracking-[0.08em] text-muted-foreground uppercase">
+                      <span
+                        className={`size-1.5 rounded-full ${link.is_active ? 'bg-success' : 'bg-slate-light'}`}
+                        aria-hidden="true"
+                      />
+                      {link.is_active ? 'Active' : 'Inactive'}
+                    </span>
+                  </TableCell>
+                  <TableCell className="text-right">
+                    <div className="flex justify-end gap-1">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        render={<RouterLink to={`/dashboard/links/${link.id}/edit`} />}
+                      >
+                        Edit
+                      </Button>
+                      <Button variant="destructive-ghost" size="sm" onClick={() => handleDelete(link)}>
+                        Delete
+                      </Button>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </div>
       )}
     </div>
   )
