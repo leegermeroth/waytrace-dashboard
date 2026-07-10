@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { addTaxonomyValue, getTaxonomyValues, suggestLinkValues } from '@/lib/api'
+import { useAuth } from '@/context/AuthContext'
 
 type UtmField = 'utm_source' | 'utm_medium' | 'utm_campaign' | 'utm_term' | 'utm_content'
 
@@ -19,6 +20,7 @@ interface Props {
 const GOVERNED: Set<UtmField> = new Set(['utm_source', 'utm_medium'])
 
 export function UtmCombobox({ id, label, clientId, field, value, onChange, placeholder }: Props) {
+  const { isContributor } = useAuth()
   const [suggestions, setSuggestions] = useState<string[]>([])
   const [open, setOpen] = useState(false)
   const containerRef = useRef<HTMLDivElement>(null)
@@ -79,8 +81,10 @@ export function UtmCombobox({ id, label, clientId, field, value, onChange, place
 
   const trimmed = value.trim().toLowerCase()
   const exactMatch = suggestions.some((s) => s === trimmed)
-  // Only governed fields get an "Add" option — free-text fields are just suggestions.
-  const showAdd = GOVERNED.has(field) && trimmed.length > 0 && !exactMatch
+  // Only governed fields get an "Add" option — free-text fields are just
+  // suggestions. Contributors can't write taxonomy values (the Worker 403s), so
+  // hide the affordance for them; they pick from approved values only.
+  const showAdd = GOVERNED.has(field) && trimmed.length > 0 && !exactMatch && !isContributor
   const showDropdown = open && (suggestions.length > 0 || showAdd)
 
   return (

@@ -72,6 +72,12 @@ export default function Settings() {
     setTimeout(() => setCopied(false), 1500)
   }
 
+  // Invited Team users (admin or contributor) authenticate with their own
+  // per-user token: /me returns no api_token, and change-email/change-password
+  // 403 for them. Show them a reduced, read-only account view instead of forms
+  // that would just error.
+  const isInvitedUser = me != null && me.user_id != null
+
   return (
     <div className="flex flex-col gap-6">
       <h1 className="text-2xl font-semibold">Settings</h1>
@@ -91,6 +97,20 @@ export default function Settings() {
             <span className="text-sm text-muted-foreground">Name</span>
             <span>{me?.name ?? '—'}</span>
           </div>
+          {isInvitedUser && (
+            <>
+              <div className="flex flex-col gap-1">
+                <span className="text-sm text-muted-foreground">Email</span>
+                <span>{me?.email ?? '—'}</span>
+              </div>
+              <div className="flex flex-col gap-1">
+                <span className="text-sm text-muted-foreground">Role</span>
+                <Badge variant="default" className="w-fit capitalize">
+                  {me?.role ?? '—'}
+                </Badge>
+              </div>
+            </>
+          )}
           <div className="flex flex-col gap-1">
             <span className="text-sm text-muted-foreground">Plan</span>
             <Badge variant={me?.tier === 'free' ? 'secondary' : 'default'} className="w-fit capitalize">
@@ -100,6 +120,8 @@ export default function Settings() {
         </CardContent>
       </Card>
 
+      {!isInvitedUser && (
+      <>
       <Card className="max-w-xl">
         <CardHeader>
           <CardTitle>Email</CardTitle>
@@ -198,6 +220,8 @@ export default function Settings() {
           </div>
         </CardContent>
       </Card>
+      </>
+      )}
     </div>
   )
 }

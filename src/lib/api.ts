@@ -49,12 +49,25 @@ export interface AuthResponse {
   api_token: string
   tier: string
   subscription_status: string
+  // Present only when an invited Team user authenticates (login / accept-invite).
+  // Absent for account-owner flows (owner is treated as full admin).
+  role?: 'admin' | 'contributor'
+  max_clients?: number
+  name?: string
+  email?: string
 }
 
 export function registerAccount(email: string, password: string, name?: string) {
   return request<AuthResponse>('/api/v1/auth/register', {
     method: 'POST',
     body: JSON.stringify({ email, password, name }),
+  })
+}
+
+export function acceptInvite(token: string, password: string, name?: string) {
+  return request<AuthResponse>('/api/v1/auth/accept-invite', {
+    method: 'POST',
+    body: JSON.stringify({ token, password, name: name || undefined }),
   })
 }
 
@@ -246,6 +259,8 @@ export interface Me {
   email: string | null
   tier: string
   max_clients: number
+  // Present only for the account owner. Invited Team users never receive the
+  // account's master token (the Worker strips it).
   api_token: string | null
   subscription_status: string
   stripe_customer_id: string | null
@@ -253,6 +268,10 @@ export interface Me {
   stripe_price_id: string | null
   subscription_started_at: string | null
   created_at: string
+  // Present only when the caller is an invited Team user. Their presence is how
+  // we tell an invited user apart from the account owner.
+  user_id?: number
+  role?: 'admin' | 'contributor'
 }
 
 export function getMe() {
@@ -337,4 +356,46 @@ export function refreshDomainStatus(id: number) {
 
 export function deleteDomain(id: number) {
   return request<{ id: number }>(`/api/v1/domains/${id}`, { method: 'DELETE' })
+}
+
+// ── Team users (multi-user management) ──────────────────────────────────────
+
+export interface TeamUser {
+  id: number
+  account_id: number
+  email: string
+  name: string
+  role: 'admin' | 'contributor'
+  is_active: number
+  status: 'active' | 'invited'
+  created_at: string
+}
+
+export function listUsers() {
+  return request<TeamUser[]>('/api/v1/users')
+}
+
+export function inviteUser(input: { email: string; name?: string; role?: 'admin' | 'contributor' }) {
+  return request<TeamUser>('/api/v1/users/invite', {
+    method: 'POST',
+    body: JSON.stringify({
+      email: input.email,
+      name: input.name || undefined,
+      role: input.role || undefined,
+    }),
+  })
+}
+
+export function updateUser(
+  id: number,
+  input: { role?: 'admin' | 'contributor'; name?: string; is_active?: boolean }
+) {
+  return request<TeamUser>(`/api/v1/users/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify(input),
+  })
+}
+
+export function deleteUser(id: number) {
+  return request<{ id: number }>(`/api/v1/users/${id}`, { method: 'DELETE' })
 }

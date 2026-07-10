@@ -11,20 +11,24 @@ const baseNavItems = [
 
 const clientsNavItem = { to: '/dashboard/clients', label: 'Workspaces', end: false }
 
-const trailingNavItems = [
+// Settings is visible to everyone; the admin-only items are added conditionally.
+const settingsNavItem = { to: '/dashboard/settings', label: 'Settings', end: true }
+const usersNavItem = { to: '/dashboard/settings/users', label: 'Users', end: false }
+const adminTrailingNavItems = [
   { to: '/dashboard/domains', label: 'Domains', end: false },
-  { to: '/dashboard/settings', label: 'Settings', end: false },
   { to: '/dashboard/billing', label: 'Billing', end: false },
 ]
 
 export default function DashboardLayout() {
-  const { logout, tier } = useAuth()
+  const { logout, tier, canAdminister } = useAuth()
   const navigate = useNavigate()
 
   const navItems = [
     ...baseNavItems,
-    ...(tier === 'agency' ? [clientsNavItem] : []),
-    ...trailingNavItems,
+    // Workspaces is a Team feature and a management surface — owner/admin only.
+    ...(tier === 'agency' && canAdminister ? [clientsNavItem] : []),
+    settingsNavItem,
+    ...(canAdminister ? [usersNavItem, ...adminTrailingNavItems] : []),
   ]
 
   function handleLogout() {
