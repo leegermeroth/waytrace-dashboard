@@ -129,7 +129,7 @@ export default function LinkDetail() {
               onClick={handleCopy}
               title={copied ? 'Copied' : 'Click to copy'}
               aria-label="Copy short link"
-              className="group/copy mono inline-flex items-center gap-1.5 text-ochre hover:text-ochre-hover"
+              className="group/copy mono inline-flex cursor-pointer items-center gap-1.5 text-ochre hover:text-ochre-hover"
             >
               {shortUrl(link)}
               {copied ? (

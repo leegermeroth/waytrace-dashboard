@@ -165,7 +165,7 @@ export default function LinksList() {
                       onClick={() => handleCopy(link)}
                       title={copiedId === link.id ? 'Copied' : 'Click to copy'}
                       aria-label="Copy short link"
-                      className="group/copy mono inline-flex items-center gap-1.5 text-xs text-muted-foreground transition-colors hover:text-ochre"
+                      className="group/copy mono inline-flex cursor-pointer items-center gap-1.5 text-xs text-muted-foreground transition-colors hover:text-ochre"
                     >
                       {shortUrl(link).replace('https://', '')}
                       {copiedId === link.id ? (
