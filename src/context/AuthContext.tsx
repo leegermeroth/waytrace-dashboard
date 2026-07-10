@@ -6,6 +6,7 @@ import {
   resetPassword,
   acceptInvite as acceptInviteApi,
   getMe,
+  markOnboarded as markOnboardedApi,
 } from '@/lib/api'
 
 /**
@@ -29,6 +30,14 @@ interface AuthContextValue extends AuthState {
   /** True for owner or invited admin — anyone who can manage the account. */
   canAdminister: boolean
   isContributor: boolean
+  /**
+   * True once /me confirms this is the account owner and the one-time onboarding
+   * flag is unset. Undefined onboarding state (not yet loaded) reads as false, so
+   * the wizard never flashes before /me resolves.
+   */
+  needsOnboarding: boolean
+  /** Stamp the onboarding flag server-side and locally so the wizard won't re-open. */
+  markOnboarded: () => Promise<void>
   login: (email: string, password: string) => Promise<void>
   register: (email: string, password: string, name?: string) => Promise<void>
   completeSetup: (token: string, password: string) => Promise<void>
@@ -59,6 +68,9 @@ function loadStoredAuth(): AuthState {
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [auth, setAuth] = useState<AuthState>(loadStoredAuth)
+  // Onboarding flag is intentionally NOT persisted: undefined = unknown (not yet
+  // loaded from /me), string = onboarded, null = never onboarded. Only /me sets it.
+  const [onboardedAt, setOnboardedAt] = useState<string | null | undefined>(undefined)
 
   const persist = useCallback((next: AuthState) => {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(next))
@@ -120,6 +132,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const logout = useCallback(() => {
     localStorage.removeItem(STORAGE_KEY)
     setAuth({ apiToken: null, tier: null, subscriptionStatus: null, role: null })
+    setOnboardedAt(undefined)
+  }, [])
+
+  const markOnboarded = useCallback(async () => {
+    try {
+      const res = await markOnboardedApi()
+      setOnboardedAt(res.onboarded_at ?? new Date().toISOString())
+    } catch {
+      // Even if the stamp call fails, close the wizard locally so it doesn't
+      // nag; /me re-syncs the authoritative flag on the next mount.
+      setOnboardedAt(new Date().toISOString())
+    }
   }, [])
 
   // Re-hydrate role/tier authoritatively from /me on mount. localStorage gives
@@ -133,6 +157,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       .then((me) => {
         if (cancelled) return
         const role: Role = me.role ?? 'owner'
+        setOnboardedAt(me.onboarded_at ?? null)
         setAuth((prev) => {
           if (prev.role === role && prev.tier === me.tier) return prev
           const next = { ...prev, role, tier: me.tier }
@@ -152,6 +177,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const effectiveRole: Role | null = auth.apiToken ? auth.role ?? 'owner' : null
 
+  const needsOnboarding =
+    Boolean(auth.apiToken) &&
+    effectiveRole === 'owner' &&
+    auth.tier !== 'free' &&
+    onboardedAt === null
+
   return (
     <AuthContext.Provider
       value={{
@@ -160,6 +191,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         isAuthenticated: Boolean(auth.apiToken),
         canAdminister: effectiveRole === 'owner' || effectiveRole === 'admin',
         isContributor: effectiveRole === 'contributor',
+        needsOnboarding,
+        markOnboarded,
         login,
         register,
         completeSetup,

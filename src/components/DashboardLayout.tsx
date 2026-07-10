@@ -1,11 +1,14 @@
 import { NavLink, Outlet, useNavigate } from 'react-router-dom'
 import { useAuth } from '@/context/AuthContext'
 import { Wordmark } from '@/components/brand'
+import { OnboardingWizard } from '@/components/OnboardingWizard'
 import { cn } from '@/lib/utils'
 
 const baseNavItems = [
   { to: '/dashboard', label: 'Home', end: true },
   { to: '/dashboard/links', label: 'Links', end: false },
+  // Analytics is read-only and available to everyone, including contributors.
+  { to: '/dashboard/analytics', label: 'Analytics', end: false },
 ]
 
 const clientsNavItem = { to: '/dashboard/clients', label: 'Workspaces', end: false }
@@ -77,6 +80,9 @@ export default function DashboardLayout() {
 
   return (
     <div className="min-h-svh md:flex">
+      {/* One-time guided setup — self-gates on needsOnboarding (owner, first login). */}
+      <OnboardingWizard />
+
       {/* Sidebar (desktop) */}
       <aside className="fixed inset-y-0 left-0 z-30 hidden w-60 flex-col border-r border-border bg-sidebar md:flex">
         <div className="flex h-[72px] items-center border-b border-border px-5">

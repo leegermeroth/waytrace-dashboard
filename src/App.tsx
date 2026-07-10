@@ -16,6 +16,7 @@ import Dashboard from '@/pages/Dashboard'
 import LinksList from '@/pages/LinksList'
 import LinkForm from '@/pages/LinkForm'
 import LinkDetail from '@/pages/LinkDetail'
+import Analytics from '@/pages/Analytics'
 import Clients from '@/pages/Clients'
 import Settings from '@/pages/Settings'
 import Users from '@/pages/Users'
@@ -41,6 +42,8 @@ export default function App() {
             <Route element={<DashboardLayout />}>
               <Route path="/dashboard" element={<Dashboard />} />
               <Route path="/dashboard/links" element={<LinksList />} />
+              {/* Analytics is read-only — available to contributors too (no AdminRoute). */}
+              <Route path="/dashboard/analytics" element={<Analytics />} />
               <Route path="/dashboard/links/new" element={<LinkForm />} />
               <Route path="/dashboard/links/:id" element={<LinkDetail />} />
               <Route path="/dashboard/links/:id/edit" element={<LinkForm />} />

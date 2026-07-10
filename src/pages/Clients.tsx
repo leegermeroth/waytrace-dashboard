@@ -1,10 +1,19 @@
 import { useEffect, useState, type FormEvent } from 'react'
-import { batchTaxonomyValues, createClient, deleteClient, listClients, updateClient, type Client } from '@/lib/api'
+import {
+  batchTaxonomyValues,
+  createClient,
+  deleteClient,
+  getTaxonomyValues,
+  listClients,
+  updateClient,
+  type Client,
+} from '@/lib/api'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { PageHeader, StatusDot } from '@/components/brand'
+import { deriveTaxonomy, PlatformPicker, platformsFromTaxonomy } from '@/components/TaxonomyWizard'
 import {
   Table,
   TableBody,
@@ -31,26 +40,6 @@ interface ClientFormState {
 
 const emptyForm: ClientFormState = { id: null, name: '', slug: '', short_domain: '' }
 
-// -------------------------------------------------------------------------
-// Wizard platform definitions
-// -------------------------------------------------------------------------
-
-interface Platform {
-  id: string
-  label: string
-  source: string
-  medium: string
-}
-
-const PLATFORMS: Platform[] = [
-  { id: 'klaviyo',   label: 'Klaviyo (email)',  source: 'klaviyo',   medium: 'email' },
-  { id: 'facebook',  label: 'Facebook',         source: 'facebook',  medium: 'organic-social' },
-  { id: 'instagram', label: 'Instagram',        source: 'instagram', medium: 'organic-social' },
-  { id: 'linkedin',  label: 'LinkedIn',         source: 'linkedin',  medium: 'organic-social' },
-  { id: 'x',         label: 'X / Twitter',      source: 'x',         medium: 'organic-social' },
-  { id: 'youtube',   label: 'YouTube',          source: 'youtube',   medium: 'organic-social' },
-]
-
 export default function Clients() {
   const [clients, setClients] = useState<Client[]>([])
   const [error, setError] = useState<string | null>(null)
@@ -68,6 +57,10 @@ export default function Clients() {
   const [paidSocial, setPaidSocial] = useState(false)
   const [wizardSaving, setWizardSaving] = useState(false)
   const [wizardError, setWizardError] = useState<string | null>(null)
+  // When creating a workspace after others exist, we pre-fill from the most
+  // recent one and name it here so the copy can explain the scope clearly.
+  const [newWorkspaceName, setNewWorkspaceName] = useState('')
+  const [prevWorkspaceName, setPrevWorkspaceName] = useState<string | null>(null)
 
   useEffect(() => {
     refresh()
@@ -110,13 +103,37 @@ export default function Clients() {
         setDialogOpen(false)
         refresh()
       } else {
+        // The current `clients` closure is the list *before* this creation — the
+        // most recent of those is the "previous workspace" to pre-fill from.
+        const previous = [...clients].sort(
+          (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+        )[0]
+
         const created = await createClient(form.name, form.slug, form.short_domain || undefined)
         setDialogOpen(false)
         refresh()
-        // Open the setup wizard for the newly created client.
+
+        // Pre-fill the wizard from the previous workspace's approved values, so a
+        // new workspace inherits a sensible starting point. Edits here apply only
+        // to the new workspace (a separate client_id) — never the previous one.
+        let prefill = { selected: new Set<string>(), paidSocial: false }
+        if (previous) {
+          try {
+            const [src, med] = await Promise.all([
+              getTaxonomyValues(previous.id, 'utm_source'),
+              getTaxonomyValues(previous.id, 'utm_medium'),
+            ])
+            prefill = platformsFromTaxonomy(src, med)
+          } catch {
+            /* Non-fatal — fall back to an empty picker. */
+          }
+        }
+
         setWizardClientId(created.id)
-        setSelectedPlatforms(new Set())
-        setPaidSocial(false)
+        setNewWorkspaceName(created.name)
+        setPrevWorkspaceName(previous?.name ?? null)
+        setSelectedPlatforms(prefill.selected)
+        setPaidSocial(prefill.paidSocial)
         setWizardError(null)
         setWizardOpen(true)
       }
@@ -152,12 +169,8 @@ export default function Clients() {
     setWizardError(null)
 
     try {
-      const selected = PLATFORMS.filter((p) => selectedPlatforms.has(p.id))
-
       // Derive unique sources and mediums from selected platforms.
-      const sources = [...new Set(selected.map((p) => p.source))]
-      const mediums = [...new Set(selected.map((p) => p.medium))]
-      if (paidSocial) mediums.push('paid-social')
+      const { sources, mediums } = deriveTaxonomy(selectedPlatforms, paidSocial)
 
       const tasks: Promise<unknown>[] = []
       if (sources.length > 0) {
@@ -293,49 +306,45 @@ export default function Clients() {
 
       {/* Setup wizard — appears after a new client is created */}
       <Dialog open={wizardOpen} onOpenChange={setWizardOpen}>
-        <DialogContent>
+        <DialogContent className="max-h-[88vh] overflow-y-auto sm:max-w-lg">
           <DialogHeader>
-            <DialogTitle>Set up approved UTM values</DialogTitle>
+            <DialogTitle>
+              Approved values for {newWorkspaceName ? `“${newWorkspaceName}”` : 'this workspace'}
+            </DialogTitle>
             <DialogDescription>
               Pick the platforms you use. Waytrace will pre-load matching source and medium values so
               your team stays consistent. You can add more any time.
             </DialogDescription>
           </DialogHeader>
 
-          <div className="flex flex-col gap-3 py-2">
+          <div className="flex flex-col gap-3 py-1">
             {wizardError && (
               <Alert variant="destructive">
                 <AlertDescription>{wizardError}</AlertDescription>
               </Alert>
             )}
 
-            <p className="text-sm font-medium">Platforms</p>
-            <div className="grid grid-cols-2 gap-2">
-              {PLATFORMS.map((p) => (
-                <label
-                  key={p.id}
-                  className="flex cursor-pointer items-center gap-2 rounded-md border px-3 py-2 text-sm hover:bg-accent"
-                >
-                  <input
-                    type="checkbox"
-                    className="accent-primary"
-                    checked={selectedPlatforms.has(p.id)}
-                    onChange={() => togglePlatform(p.id)}
-                  />
-                  {p.label}
-                </label>
-              ))}
-            </div>
+            {prevWorkspaceName && (
+              <div className="flex items-start gap-2 rounded-md border border-border bg-cast p-3 text-xs text-muted-foreground">
+                <span className="mt-1 size-1.5 shrink-0 rounded-full bg-ochre" aria-hidden="true" />
+                <span>
+                  Pre-filled from your most recent workspace,{' '}
+                  <span className="font-medium text-foreground">{prevWorkspaceName}</span>. Changes
+                  here apply only to{' '}
+                  <span className="font-medium text-foreground">
+                    {newWorkspaceName || 'this workspace'}
+                  </span>{' '}
+                  — {prevWorkspaceName} is left untouched.
+                </span>
+              </div>
+            )}
 
-            <label className="flex cursor-pointer items-center gap-2 rounded-md border px-3 py-2 text-sm hover:bg-accent">
-              <input
-                type="checkbox"
-                className="accent-primary"
-                checked={paidSocial}
-                onChange={(e) => setPaidSocial(e.target.checked)}
-              />
-              Also use paid social (adds <code className="text-xs">paid-social</code> as a medium)
-            </label>
+            <PlatformPicker
+              selected={selectedPlatforms}
+              onToggle={togglePlatform}
+              paidSocial={paidSocial}
+              onPaidSocialChange={setPaidSocial}
+            />
           </div>
 
           <DialogFooter>

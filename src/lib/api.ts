@@ -268,6 +268,9 @@ export interface Me {
   stripe_subscription_id: string | null
   stripe_price_id: string | null
   subscription_started_at: string | null
+  // ISO timestamp stamped once the account owner completes/skips the onboarding
+  // wizard. NULL until then — how the first-login wizard gate is decided.
+  onboarded_at: string | null
   created_at: string
   // Present only when the caller is an invited Team user. Their presence is how
   // we tell an invited user apart from the account owner.
@@ -277,6 +280,14 @@ export interface Me {
 
 export function getMe() {
   return request<Me>('/api/v1/me')
+}
+
+/** Stamp the one-time onboarding flag on the account (idempotent server-side). */
+export function markOnboarded() {
+  return request<{ onboarded_at: string | null }>('/api/v1/me/onboarded', {
+    method: 'POST',
+    body: JSON.stringify({}),
+  })
 }
 
 export function changePassword(current_password: string, new_password: string) {
@@ -399,4 +410,53 @@ export function updateUser(
 
 export function deleteUser(id: number) {
   return request<{ id: number }>(`/api/v1/users/${id}`, { method: 'DELETE' })
+}
+
+// ── Aggregate analytics ──────────────────────────────────────────────────────
+
+export interface AnalyticsDimensionRow {
+  key: string
+  total: number
+  clicks: number
+  scans: number
+}
+
+export interface AnalyticsTopLink {
+  id: number
+  label: string
+  short_code: string
+  total: number
+  clicks: number
+  scans: number
+}
+
+export interface Analytics {
+  totals: { total: number; clicks: number; scans: number }
+  timeseries: { day: string; clicks: number; scans: number }[]
+  bySource: AnalyticsDimensionRow[]
+  byMedium: AnalyticsDimensionRow[]
+  byCampaign: AnalyticsDimensionRow[]
+  byWorkspace: AnalyticsDimensionRow[]
+  topLinks: AnalyticsTopLink[]
+}
+
+export interface AnalyticsFilters {
+  client_id?: number
+  source?: string
+  medium?: string
+  campaign?: string
+  from?: string
+  to?: string
+}
+
+export function getAnalytics(filters: AnalyticsFilters = {}) {
+  const params = new URLSearchParams()
+  if (filters.client_id) params.set('client_id', String(filters.client_id))
+  if (filters.source) params.set('source', filters.source)
+  if (filters.medium) params.set('medium', filters.medium)
+  if (filters.campaign) params.set('campaign', filters.campaign)
+  if (filters.from) params.set('from', filters.from)
+  if (filters.to) params.set('to', filters.to)
+  const query = params.toString()
+  return request<Analytics>(`/api/v1/analytics${query ? `?${query}` : ''}`)
 }
