@@ -8,7 +8,7 @@ export default function Privacy() {
       </p>
 
       <h1 className="text-2xl font-semibold mb-1">Privacy Policy</h1>
-      <p className="text-muted-foreground mb-8">Effective date: July 1, 2026</p>
+      <p className="text-muted-foreground mb-8">Effective date: July 10, 2026</p>
 
       <p className="mb-6">
         This Privacy Policy explains how Germeroth Consulting &amp; Creative ("we," "us," or
@@ -32,8 +32,10 @@ export default function Privacy() {
           labels you create in Waytrace.
         </li>
         <li>
-          <strong>Click data</strong> — when someone clicks a short link managed by Waytrace, we
-          log the timestamp, approximate country, and device type. We do not store IP addresses.
+          <strong>Click and scan data</strong> — when someone clicks a short link or scans a QR
+          code managed by Waytrace, we log the timestamp, approximate country, device type,
+          referrer, and whether the interaction was a link click or QR scan. We do not store IP
+          addresses.
         </li>
       </ul>
 
@@ -62,14 +64,22 @@ export default function Privacy() {
           <strong>Resend</strong> — transactional email delivery (account setup and password
           reset emails only).
         </li>
+        <li>
+          <strong>Cloudflare R2</strong> — encrypted daily backups of the database for disaster
+          recovery.
+        </li>
       </ul>
       <p className="mb-4">We do not sell your data to third parties.</p>
 
       <h2 className="font-semibold mt-8 mb-2">4. Data Retention</h2>
       <p className="mb-4">
-        We retain your account and link data for as long as your subscription is active. After
-        cancellation you may request deletion of your data by emailing{' '}
-        <a href="mailto:hello@waytrace.co" className="underline">hello@waytrace.co</a>. Click
+        We retain your account and Workspace/link data for as long as your account exists. If you
+        cancel within 14 days of subscribing, your Workspace, link, and click/scan data is
+        permanently deleted as part of that cancellation (see our{' '}
+        <Link to="/terms" className="underline">Terms of Service</Link>). If you cancel after 14
+        days or are on the free tier, your data is retained but you may request full deletion at
+        any time by emailing{' '}
+        <a href="mailto:hello@waytrace.co" className="underline">hello@waytrace.co</a>. Click/scan
         analytics are retained for up to 24 months.
       </p>
 

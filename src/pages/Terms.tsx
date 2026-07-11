@@ -8,7 +8,7 @@ export default function Terms() {
       </p>
 
       <h1 className="text-2xl font-semibold mb-1">Terms of Service</h1>
-      <p className="text-muted-foreground mb-8">Effective date: July 1, 2026</p>
+      <p className="text-muted-foreground mb-8">Effective date: July 10, 2026</p>
 
       <p className="mb-6">
         These Terms of Service ("Terms") govern your use of Waytrace, a campaign link management
@@ -36,12 +36,24 @@ export default function Terms() {
         issue prorated refunds for unused time except where required by applicable law.
       </p>
 
-      <h2 className="font-semibold mt-8 mb-2">3. Acceptable Use</h2>
+      <h2 className="font-semibold mt-8 mb-2">3. Acceptable Use &amp; Fair Use</h2>
       <p className="mb-4">
-        You may use Waytrace only for lawful purposes. You may not use the service to create or
-        distribute links to illegal content, malware, phishing pages, or content that violates
-        the rights of others. We reserve the right to suspend or terminate accounts that violate
-        this policy without refund.
+        You may use Waytrace only for lawful purposes. You may not use the Service to create,
+        distribute, or redirect through links to illegal content, malware, phishing pages, spam,
+        or content that infringes the rights of others.
+      </p>
+      <p className="mb-4">
+        Your plan includes a set number of Workspaces, Users, and branded domains as described on
+        our pricing page; these limits are enforced automatically. We do not cap the number of
+        tracking links or clicks you may create, but we reserve the right to apply reasonable
+        rate limits, suspend link creation, or require an upgrade if usage patterns indicate
+        abuse, automated bulk creation designed to circumvent plan limits, or a load pattern that
+        threatens the stability of the Service for other customers.
+      </p>
+      <p className="mb-4">
+        We may disable or remove any individual link, at our discretion and without notice, if it
+        is used for illegal activity, malware distribution, phishing, or a violation of these
+        Terms. We will make reasonable efforts to notify you when we do so.
       </p>
 
       <h2 className="font-semibold mt-8 mb-2">4. Your Data</h2>
@@ -66,11 +78,28 @@ export default function Terms() {
         preceding the claim.
       </p>
 
-      <h2 className="font-semibold mt-8 mb-2">7. Termination</h2>
+      <h2 className="font-semibold mt-8 mb-2">7. Termination, Cancellation &amp; Data Retention</h2>
       <p className="mb-4">
-        We may suspend or terminate your account for violation of these Terms, non-payment, or
-        for any other reason with reasonable notice. You may terminate your account at any time
-        by canceling your subscription and contacting us to request data deletion.
+        You may cancel your subscription at any time from your account's Billing settings.
+      </p>
+      <p className="mb-4">
+        <strong>Within 14 days of your subscription start date:</strong> cancelling immediately
+        terminates and refunds your subscription in full, and permanently deletes all of your
+        Workspaces, links, click/scan history, and branded domain configurations. This deletion is
+        irreversible. Your account itself is not deleted and you may still log in, downgraded to
+        the free tier.
+      </p>
+      <p className="mb-4">
+        <strong>After 14 days:</strong> cancelling schedules your subscription to end at the close
+        of the current billing period. No refund is issued for the remaining period. Your data is
+        not touched and remains accessible until the paid period ends, at which point your account
+        is downgraded to the free tier (Workspaces, links, and click history are retained but
+        read-only/limited per the free tier).
+      </p>
+      <p className="mb-4">
+        We may suspend or terminate your account for violation of these Terms or non-payment, with
+        reasonable notice where practicable. If your account is terminated for cause, we may
+        delete your data after a reasonable notice period.
       </p>
 
       <h2 className="font-semibold mt-8 mb-2">8. Changes to These Terms</h2>
