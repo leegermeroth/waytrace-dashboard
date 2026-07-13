@@ -332,6 +332,19 @@ export function resendSetupEmail(session_id: string, email?: string) {
   })
 }
 
+/** Send an Enterprise sales inquiry (public endpoint — emailed to hello@waytrace.co). */
+export function enterpriseInquiry(input: { name: string; email: string; company?: string; message?: string }) {
+  return request<{ message: string }>('/api/v1/enterprise-inquiry', {
+    method: 'POST',
+    body: JSON.stringify({
+      name: input.name,
+      email: input.email,
+      company: input.company || undefined,
+      message: input.message || undefined,
+    }),
+  })
+}
+
 export function createCheckoutSession(price_id: string) {
   return request<{ url: string }>('/api/v1/billing/checkout', {
     method: 'POST',

@@ -1,8 +1,16 @@
-import { useEffect, useState } from 'react'
-import { cancelSubscription, createCheckoutSession, createPortalSession, getMe, type Me } from '@/lib/api'
+import { useEffect, useState, type FormEvent } from 'react'
+import {
+  cancelSubscription,
+  createCheckoutSession,
+  createPortalSession,
+  enterpriseInquiry,
+  getMe,
+  type Me,
+} from '@/lib/api'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { PageHeader } from '@/components/brand'
@@ -53,22 +61,45 @@ const TIER_LABELS: Record<string, string> = {
   agency: 'Team',
 }
 
+// Low → high, so we can label a plan change as an upgrade vs. a downgrade.
+const TIER_RANK: Record<string, number> = { free: 0, pro: 1, agency: 2 }
+
 function statusVariant(status: string | undefined): 'success' | 'secondary' | 'destructive' {
   if (status === 'active' || status === 'trialing') return 'success'
   if (status === 'cancelled' || status === 'unpaid') return 'destructive'
   return 'secondary'
 }
 
+/** Which billing interval a Stripe price ID corresponds to, or null if unknown. */
+function intervalForPrice(priceId: string | null | undefined): 'monthly' | 'annual' | null {
+  if (!priceId) return null
+  for (const plan of PLANS) {
+    if (plan.monthly.priceId === priceId) return 'monthly'
+    if (plan.annual.priceId === priceId) return 'annual'
+  }
+  return null
+}
+
 export default function Billing() {
   const [me, setMe] = useState<Me | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [pendingAction, setPendingAction] = useState<string | null>(null)
-  const [interval, setInterval] = useState<'monthly' | 'annual'>('monthly')
+  // Annual is the default view — it's the better-value option we want to lead with.
+  const [interval, setInterval] = useState<'monthly' | 'annual'>('annual')
 
   const [cancelDialogOpen, setCancelDialogOpen] = useState(false)
   const [cancelConfirmText, setCancelConfirmText] = useState('')
   const [isCancelling, setIsCancelling] = useState(false)
   const [cancelResult, setCancelResult] = useState<string | null>(null)
+
+  // Enterprise inquiry form.
+  const [entName, setEntName] = useState('')
+  const [entEmail, setEntEmail] = useState('')
+  const [entCompany, setEntCompany] = useState('')
+  const [entMessage, setEntMessage] = useState('')
+  const [entSending, setEntSending] = useState(false)
+  const [entError, setEntError] = useState<string | null>(null)
+  const [entSent, setEntSent] = useState(false)
 
   useEffect(() => {
     load()
@@ -76,8 +107,32 @@ export default function Billing() {
 
   function load() {
     getMe()
-      .then(setMe)
+      .then((data) => {
+        setMe(data)
+        // Prefill the Enterprise form from the account, but don't clobber edits.
+        setEntName((n) => n || data.name || '')
+        setEntEmail((e) => e || data.email || '')
+      })
       .catch((err) => setError(err instanceof Error ? err.message : 'Failed to load billing info'))
+  }
+
+  async function handleEnterpriseInquiry(e: FormEvent) {
+    e.preventDefault()
+    setEntError(null)
+    setEntSending(true)
+    try {
+      await enterpriseInquiry({
+        name: entName,
+        email: entEmail,
+        company: entCompany,
+        message: entMessage,
+      })
+      setEntSent(true)
+    } catch (err) {
+      setEntError(err instanceof Error ? err.message : 'Could not send your inquiry')
+    } finally {
+      setEntSending(false)
+    }
   }
 
   async function handleUpgrade(priceId: string) {
@@ -143,11 +198,16 @@ export default function Billing() {
         <CardHeader>
           <CardTitle>Current plan</CardTitle>
         </CardHeader>
-        <CardContent className="flex items-center gap-3">
+        <CardContent className="flex flex-wrap items-center gap-3">
           <Badge className="capitalize">{me?.tier ? (TIER_LABELS[me.tier] ?? me.tier) : '—'}</Badge>
           <Badge variant={statusVariant(me?.subscription_status)} className="capitalize">
             {me?.subscription_status ?? '—'}
           </Badge>
+          {intervalForPrice(me?.stripe_price_id) && (
+            <Badge variant="secondary">
+              {intervalForPrice(me?.stripe_price_id) === 'annual' ? 'Annual' : 'Monthly'}
+            </Badge>
+          )}
         </CardContent>
         {me?.stripe_customer_id && (
           <CardFooter>
@@ -176,6 +236,8 @@ export default function Billing() {
           const selected = plan[interval]
           const isCurrentPrice = me?.stripe_price_id === selected.priceId
           const isCurrentTierOtherInterval = me?.tier === plan.tier && !isCurrentPrice
+          const currentRank = TIER_RANK[me?.tier ?? 'free'] ?? 0
+          const changeVerb = (TIER_RANK[plan.tier] ?? 0) < currentRank ? 'Downgrade' : 'Upgrade'
           return (
             <Card key={plan.tier}>
               <CardHeader>
@@ -196,13 +258,72 @@ export default function Billing() {
                       ? 'Redirecting...'
                       : isCurrentTierOtherInterval
                         ? `Switch to ${interval === 'annual' ? 'annual' : 'monthly'} billing`
-                        : `Upgrade to ${plan.label}`}
+                        : `${changeVerb} to ${plan.label}`}
                 </Button>
               </CardFooter>
             </Card>
           )
         })}
       </div>
+
+      <Card className="max-w-xl">
+        <CardHeader>
+          <CardTitle>Need Enterprise?</CardTitle>
+          <CardDescription>
+            Custom workspaces, users, branded domains, and support for larger teams. Tell us what you
+            need and we'll be in touch — no checkout required.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {entSent ? (
+            <Alert>
+              <AlertDescription>Thanks — we've got your inquiry and will be in touch shortly.</AlertDescription>
+            </Alert>
+          ) : (
+            <form onSubmit={handleEnterpriseInquiry} className="flex flex-col gap-4">
+              {entError && (
+                <Alert variant="destructive">
+                  <AlertDescription>{entError}</AlertDescription>
+                </Alert>
+              )}
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="flex flex-col gap-2">
+                  <Label htmlFor="ent_name">Name</Label>
+                  <Input id="ent_name" required value={entName} onChange={(e) => setEntName(e.target.value)} />
+                </div>
+                <div className="flex flex-col gap-2">
+                  <Label htmlFor="ent_email">Email</Label>
+                  <Input
+                    id="ent_email"
+                    type="email"
+                    required
+                    value={entEmail}
+                    onChange={(e) => setEntEmail(e.target.value)}
+                  />
+                </div>
+              </div>
+              <div className="flex flex-col gap-2">
+                <Label htmlFor="ent_company">Company (optional)</Label>
+                <Input id="ent_company" value={entCompany} onChange={(e) => setEntCompany(e.target.value)} />
+              </div>
+              <div className="flex flex-col gap-2">
+                <Label htmlFor="ent_message">What do you need? (optional)</Label>
+                <textarea
+                  id="ent_message"
+                  rows={4}
+                  value={entMessage}
+                  onChange={(e) => setEntMessage(e.target.value)}
+                  placeholder="Team size, number of brands or domains, timelines, anything else…"
+                  className="min-h-24 rounded-md border border-border bg-transparent px-3 py-2 text-sm outline-none transition-colors focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
+                />
+              </div>
+              <Button type="submit" disabled={entSending} className="w-fit">
+                {entSending ? 'Sending…' : 'Contact sales'}
+              </Button>
+            </form>
+          )}
+        </CardContent>
+      </Card>
 
       {me?.stripe_subscription_id && (
         <Card className="max-w-xl">
