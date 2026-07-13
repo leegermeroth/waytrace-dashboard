@@ -104,6 +104,8 @@ export interface Client {
   name: string
   slug: string
   short_domain: string | null
+  // The workspace's current domain for NEW links (null = shared default waygo.to).
+  link_domain: string | null
   account_id: number | null
   is_active: number
   created_at: string
@@ -112,6 +114,8 @@ export interface Client {
 export interface Link {
   id: number
   client_id: number
+  // The domain this link answers on, stamped at creation and permanent.
+  domain: string
   short_code: string
   destination_url: string
   utm_source: string | null
@@ -156,16 +160,16 @@ export function listClients() {
   return request<Client[]>('/api/v1/clients')
 }
 
-export function createClient(name: string, slug: string, short_domain?: string) {
+export function createClient(name: string, slug: string, short_domain?: string, link_domain?: string | null) {
   return request<Client>('/api/v1/clients', {
     method: 'POST',
-    body: JSON.stringify({ name, slug, short_domain: short_domain || undefined }),
+    body: JSON.stringify({ name, slug, short_domain: short_domain || undefined, link_domain: link_domain ?? undefined }),
   })
 }
 
 export function updateClient(
   id: number,
-  input: { name: string; slug: string; short_domain?: string; is_active?: boolean }
+  input: { name: string; slug: string; short_domain?: string; link_domain?: string | null; is_active?: boolean }
 ) {
   return request<Client>(`/api/v1/clients/${id}`, {
     method: 'PUT',
@@ -241,6 +245,12 @@ export function addTaxonomyValue(clientId: number, field: string, value: string)
   })
 }
 
+export function deleteTaxonomyValue(clientId: number, valueId: number) {
+  return request<{ id: number }>(`/api/v1/clients/${clientId}/taxonomy/${valueId}`, {
+    method: 'DELETE',
+  })
+}
+
 export function batchTaxonomyValues(clientId: number, field: string, values: string[]) {
   return request<{ inserted: number }>(`/api/v1/clients/${clientId}/taxonomy/batch`, {
     method: 'POST',
@@ -271,6 +281,9 @@ export interface Me {
   // ISO timestamp stamped once the account owner completes/skips the onboarding
   // wizard. NULL until then — how the first-login wizard gate is decided.
   onboarded_at: string | null
+  // The account's self-reported organization type (Agency, Ecommerce, …).
+  // NULL until set during onboarding. Used for analytics + light suggestions.
+  org_type: string | null
   created_at: string
   // Present only when the caller is an invited Team user. Their presence is how
   // we tell an invited user apart from the account owner.
@@ -287,6 +300,14 @@ export function markOnboarded() {
   return request<{ onboarded_at: string | null }>('/api/v1/me/onboarded', {
     method: 'POST',
     body: JSON.stringify({}),
+  })
+}
+
+/** Set the account's organization type (Agency, Ecommerce, …). */
+export function setOrgType(org_type: string) {
+  return request<{ org_type: string | null }>('/api/v1/me/org-type', {
+    method: 'POST',
+    body: JSON.stringify({ org_type }),
   })
 }
 
@@ -340,6 +361,8 @@ export interface CustomDomain {
   cf_route_id: string | null
   status: 'pending' | 'active' | 'failed'
   created_at: string
+  // Number of links stamped with this domain (present on the list response).
+  link_count?: number
 }
 
 export async function listDomains(): Promise<{ domains: CustomDomain[]; cnameTarget: string }> {

@@ -61,7 +61,12 @@ export default function Domains() {
   }
 
   async function handleDelete(id: number, hostname: string) {
-    if (!confirm(`Remove ${hostname}? Short links on this domain will stop working.`)) return
+    const count = domains.find((d) => d.id === id)?.link_count ?? 0
+    const warning =
+      count > 0
+        ? `Remove ${hostname}? ${count} existing ${count === 1 ? 'link' : 'links'} on this domain will stop working, and this can't be undone.`
+        : `Remove ${hostname}? Any short links created on this domain will stop working.`
+    if (!confirm(warning)) return
     setDeletingId(id)
     try {
       await deleteDomain(id)
@@ -155,6 +160,7 @@ export default function Domains() {
                     <span className="mono text-sm font-medium">{domain.hostname}</span>
                     <span className="eyebrow-sm">
                       Added {new Date(domain.created_at).toLocaleDateString()}
+                      {domain.link_count ? ` · ${domain.link_count} ${domain.link_count === 1 ? 'link' : 'links'}` : ''}
                     </span>
                   </div>
                   <div className="flex items-center gap-2">

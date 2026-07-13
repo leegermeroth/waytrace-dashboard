@@ -1,6 +1,7 @@
 import { useEffect, useState, type FormEvent } from 'react'
+import { Link } from 'react-router-dom'
 import { changePassword, changeEmail, getMe, type Me } from '@/lib/api'
-import { Button } from '@/components/ui/button'
+import { Button, buttonVariants } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
@@ -132,6 +133,20 @@ export default function Settings() {
 
       {!isInvitedUser && (
       <>
+      <Card className="max-w-xl">
+        <CardHeader>
+          <CardTitle>Tracking Foundation</CardTitle>
+          <CardDescription>
+            The shared sources and mediums your team reuses on every link. Edit them any time.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Link to="/dashboard/settings/tracking-foundation" className={buttonVariants({ variant: 'outline' })}>
+            Manage tracking foundation
+          </Link>
+        </CardContent>
+      </Card>
+
       <Card className="max-w-xl">
         <CardHeader>
           <CardTitle>Email</CardTitle>

@@ -19,6 +19,7 @@ import LinkDetail from '@/pages/LinkDetail'
 import Analytics from '@/pages/Analytics'
 import Clients from '@/pages/Clients'
 import Settings from '@/pages/Settings'
+import TrackingFoundationSettings from '@/pages/TrackingFoundationSettings'
 import Users from '@/pages/Users'
 import Billing from '@/pages/Billing'
 import Domains from '@/pages/Domains'
@@ -51,6 +52,7 @@ export default function App() {
               {/* Owner/admin only — contributors are redirected to /dashboard. */}
               <Route element={<AdminRoute />}>
                 <Route path="/dashboard/clients" element={<Clients />} />
+                <Route path="/dashboard/settings/tracking-foundation" element={<TrackingFoundationSettings />} />
                 <Route path="/dashboard/settings/users" element={<Users />} />
                 <Route path="/dashboard/billing" element={<Billing />} />
                 <Route path="/dashboard/domains" element={<Domains />} />

@@ -1,8 +1,12 @@
 import type { Link } from '@/lib/api'
 
-/** The public short URL for a link (the redirect appends UTMs server-side). */
-export function shortUrl(link: Pick<Link, 'short_code' | 'short_domain'>): string {
-  const domain = link.short_domain || 'waygo.to'
+/**
+ * The public short URL for a link. Uses the link's own stamped `domain` (the
+ * domain it was created on and permanently answers on), falling back to the
+ * shared default. The redirect appends UTMs server-side.
+ */
+export function shortUrl(link: Pick<Link, 'short_code' | 'domain'>): string {
+  const domain = link.domain || 'waygo.to'
   return `https://${domain}/${link.short_code}`
 }
 
@@ -11,7 +15,7 @@ export function shortUrl(link: Pick<Link, 'short_code' | 'short_domain'>): strin
  * Worker's redirect handler records hits on this URL as *scans* rather than
  * *clicks*, so QR engagement is tracked separately from link clicks.
  */
-export function scanUrl(link: Pick<Link, 'short_code' | 'short_domain'>): string {
+export function scanUrl(link: Pick<Link, 'short_code' | 'domain'>): string {
   return `${shortUrl(link)}?qr=1`
 }
 
