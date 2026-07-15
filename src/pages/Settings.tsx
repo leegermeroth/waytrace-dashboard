@@ -149,6 +149,20 @@ export default function Settings() {
 
       <Card className="max-w-xl">
         <CardHeader>
+          <CardTitle>Integrations</CardTitle>
+          <CardDescription>
+            Connect Google Analytics to see sessions, key events, and revenue alongside your clicks and scans.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Link to="/dashboard/settings/integrations" className={buttonVariants({ variant: 'outline' })}>
+            Manage integrations
+          </Link>
+        </CardContent>
+      </Card>
+
+      <Card className="max-w-xl">
+        <CardHeader>
           <CardTitle>Email</CardTitle>
           <CardDescription>Used to log in and for billing/receipt emails from Stripe.</CardDescription>
         </CardHeader>

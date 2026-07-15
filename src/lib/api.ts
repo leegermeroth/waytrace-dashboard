@@ -109,6 +109,10 @@ export interface Client {
   account_id: number | null
   is_active: number
   created_at: string
+  // GA4 mapping (v1.23) — the (login, property) this workspace's links report on.
+  ga4_connection_id?: number | null
+  ga4_property_id?: string | null
+  ga4_property_name?: string | null
 }
 
 export interface Link {
@@ -495,4 +499,54 @@ export function getAnalytics(filters: AnalyticsFilters = {}) {
   if (filters.to) params.set('to', filters.to)
   const query = params.toString()
   return request<Analytics>(`/api/v1/analytics${query ? `?${query}` : ''}`)
+}
+
+// ── GA4 integration (v1.23) ──────────────────────────────────────────────────
+
+export interface Ga4Connection {
+  id: number
+  google_email: string
+  status: string
+  created_at: string
+}
+
+export interface Ga4Property {
+  connection_id: number
+  google_email: string
+  property_id: string
+  property_name: string
+  ga_account_name: string
+}
+
+/** Connected Google logins for this account (no tokens exposed). */
+export function getGa4Connections() {
+  return request<Ga4Connection[]>('/api/v1/integrations/ga4')
+}
+
+/** Google consent URL to add (or reconnect) a login. Redirect the browser to it. */
+export function getGa4AuthUrl() {
+  return request<{ url: string }>('/api/v1/integrations/ga4/auth-url')
+}
+
+/** Every GA4 property across all connected logins, tagged with its connection. */
+export function getGa4Properties() {
+  return request<{ properties: Ga4Property[]; errors: { connection_id: number; google_email: string; error: string }[] }>(
+    '/api/v1/integrations/ga4/properties'
+  )
+}
+
+/** Assign a workspace's (connection, property) mapping, or clear it with null. */
+export function setWorkspaceGa4Property(
+  clientId: number,
+  mapping: { connection_id: number; property_id: string; property_name: string } | null
+) {
+  return request<{ client_id: number; ga4_property_id: string | null }>(
+    `/api/v1/integrations/ga4/workspaces/${clientId}`,
+    { method: 'PUT', body: JSON.stringify(mapping ?? {}) }
+  )
+}
+
+/** Disconnect one Google login. */
+export function disconnectGa4(connectionId: number) {
+  return request<{ id: number }>(`/api/v1/integrations/ga4/${connectionId}`, { method: 'DELETE' })
 }
