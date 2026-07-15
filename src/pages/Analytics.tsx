@@ -12,14 +12,18 @@ import {
 } from 'recharts'
 import {
   getAnalytics,
+  getGa4Analytics,
   listClients,
   listLinks,
   type Analytics as AnalyticsData,
   type AnalyticsDimensionRow,
+  type Ga4Aggregate,
+  type Ga4DimensionRow,
   type Client,
   type Link,
 } from '@/lib/api'
 import { PageHeader, StatCard } from '@/components/brand'
+import { buttonVariants } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import {
@@ -55,15 +59,23 @@ function Swatch({ color, label }: { color: string; label: string }) {
   )
 }
 
-/** A proportional clicks/scans breakdown for one dimension (source, medium, …). */
+/** Format GA4 revenue (property currency unknown — shown as USD, refine later). */
+function fmtRevenue(v: number): string {
+  return v.toLocaleString(undefined, { style: 'currency', currency: 'USD', maximumFractionDigits: 0 })
+}
+
+/** A proportional clicks/scans breakdown for one dimension (source, medium, …).
+ *  When a GA4 lookup is supplied, each row also shows matched post-click sessions. */
 function BreakdownCard({
   title,
   description,
   rows,
+  ga4,
 }: {
   title: string
   description: string
   rows: AnalyticsDimensionRow[]
+  ga4?: Map<string, Ga4DimensionRow>
 }) {
   const max = Math.max(1, ...rows.map((r) => r.total))
   return (
@@ -77,12 +89,17 @@ function BreakdownCard({
           <p className="font-serif text-sm text-muted-foreground italic">No data in this range.</p>
         ) : (
           <ul className="flex flex-col gap-3">
-            {rows.slice(0, 8).map((r) => (
+            {rows.slice(0, 8).map((r) => {
+              const g = ga4?.get(r.key)
+              return (
               <li key={r.key} className="flex flex-col gap-1.5">
                 <div className="flex items-baseline justify-between gap-4">
                   <span className="mono truncate text-xs text-foreground">{r.key}</span>
                   <span className="mono shrink-0 text-xs text-muted-foreground">
                     {r.total.toLocaleString()}
+                    {g && g.sessions > 0 && (
+                      <span className="text-ochre"> · {g.sessions.toLocaleString()} sess</span>
+                    )}
                   </span>
                 </div>
                 <div className="h-1.5 w-full rounded-full bg-border/60">
@@ -95,7 +112,8 @@ function BreakdownCard({
                   </div>
                 </div>
               </li>
-            ))}
+              )
+            })}
           </ul>
         )}
       </CardContent>
@@ -103,10 +121,16 @@ function BreakdownCard({
   )
 }
 
+/** Build a key→row lookup from a GA4 breakdown for merging into BreakdownCard. */
+function ga4Lookup(rows: Ga4DimensionRow[] | undefined): Map<string, Ga4DimensionRow> {
+  return new Map((rows ?? []).map((r) => [r.key, r]))
+}
+
 export default function Analytics() {
   const [clients, setClients] = useState<Client[]>([])
   const [links, setLinks] = useState<Link[]>([])
   const [data, setData] = useState<AnalyticsData | null>(null)
+  const [ga4, setGa4] = useState<Ga4Aggregate | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(true)
 
@@ -150,20 +174,29 @@ export default function Analytics() {
   useEffect(() => {
     setIsLoading(true)
     setError(null)
-    getAnalytics({
+    const filters = {
       client_id: workspace !== 'all' ? Number(workspace) : undefined,
       source: source !== 'all' ? source : undefined,
       medium: medium !== 'all' ? medium : undefined,
       campaign: campaign !== 'all' ? campaign : undefined,
       from: rangeFrom(range),
-    })
+    }
+    getAnalytics(filters)
       .then(setData)
       .catch((err) => setError(err instanceof Error ? err.message : 'Failed to load analytics'))
       .finally(() => setIsLoading(false))
+    // GA4 is a slower, best-effort side channel — never blocks or errors the page.
+    setGa4(null)
+    getGa4Analytics(filters)
+      .then(setGa4)
+      .catch(() => setGa4(null))
   }, [workspace, source, medium, campaign, range])
 
   const totals = data?.totals ?? { total: 0, clicks: 0, scans: 0 }
   const rangeLabel = RANGES.find((r) => r.value === range)?.label ?? ''
+  const ga4Source = useMemo(() => ga4Lookup(ga4?.bySource), [ga4])
+  const ga4Medium = useMemo(() => ga4Lookup(ga4?.byMedium), [ga4])
+  const ga4Campaign = useMemo(() => ga4Lookup(ga4?.byCampaign), [ga4])
 
   return (
     <div className="flex flex-col gap-6">
@@ -264,6 +297,42 @@ export default function Analytics() {
         <StatCard label="QR scans" value={isLoading ? '—' : totals.scans.toLocaleString()} />
       </div>
 
+      {/* Post-click (GA4) */}
+      {ga4?.connected ? (
+        <div className="flex flex-col gap-3">
+          <div className="flex flex-wrap items-baseline justify-between gap-2">
+            <span className="eyebrow">Post-click · Google Analytics</span>
+            {ga4.unmappedWorkspaces > 0 && (
+              <RouterLink to="/dashboard/settings/integrations" className="mono text-[0.7rem] text-slate hover:text-ochre">
+                {ga4.unmappedWorkspaces} workspace{ga4.unmappedWorkspaces === 1 ? '' : 's'} unmapped →
+              </RouterLink>
+            )}
+          </div>
+          <div className="grid grid-cols-3 gap-4">
+            <StatCard label="Sessions" value={ga4.totals.sessions.toLocaleString()} />
+            <StatCard label="Key events" value={ga4.totals.keyEvents.toLocaleString()} />
+            <StatCard label="Revenue" value={fmtRevenue(ga4.totals.revenue)} />
+          </div>
+          {ga4.errors.length > 0 && (
+            <p className="mono text-[0.7rem] text-destructive">
+              Couldn't load some GA4 data — reconnect {ga4.errors.map((e) => e.google_email).join(', ')} in Integrations.
+            </p>
+          )}
+        </div>
+      ) : (
+        <Card className="border-dashed">
+          <CardContent className="flex flex-col items-start gap-2 py-5">
+            <span className="eyebrow">Post-click · Google Analytics</span>
+            <p className="text-sm text-muted-foreground">
+              Connect Google Analytics to see sessions, key events, and revenue for every campaign — the full picture from click to conversion.
+            </p>
+            <RouterLink to="/dashboard/settings/integrations" className={buttonVariants({ variant: 'outline', size: 'sm' })}>
+              Connect Google Analytics
+            </RouterLink>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Activity over time */}
       <Card>
         <CardHeader>
@@ -321,9 +390,9 @@ export default function Analytics() {
 
       {/* Breakdowns */}
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-        <BreakdownCard title="By source" description="Where traffic originates" rows={data?.bySource ?? []} />
-        <BreakdownCard title="By medium" description="Channel type" rows={data?.byMedium ?? []} />
-        <BreakdownCard title="By campaign" description="Grouped by utm_campaign" rows={data?.byCampaign ?? []} />
+        <BreakdownCard title="By source" description="Where traffic originates" rows={data?.bySource ?? []} ga4={ga4?.connected ? ga4Source : undefined} />
+        <BreakdownCard title="By medium" description="Channel type" rows={data?.byMedium ?? []} ga4={ga4?.connected ? ga4Medium : undefined} />
+        <BreakdownCard title="By campaign" description="Grouped by utm_campaign" rows={data?.byCampaign ?? []} ga4={ga4?.connected ? ga4Campaign : undefined} />
         <BreakdownCard title="By workspace" description="Grouped by workspace" rows={data?.byWorkspace ?? []} />
       </div>
 

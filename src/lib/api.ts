@@ -550,3 +550,55 @@ export function setWorkspaceGa4Property(
 export function disconnectGa4(connectionId: number) {
   return request<{ id: number }>(`/api/v1/integrations/ga4/${connectionId}`, { method: 'DELETE' })
 }
+
+// ── GA4 reporting (post-click data) ──────────────────────────────────────────
+
+export interface Ga4DimensionRow {
+  key: string
+  sessions: number
+  keyEvents: number
+  revenue: number
+}
+
+export interface Ga4Aggregate {
+  connected: boolean
+  mappedWorkspaces: number
+  unmappedWorkspaces: number
+  totals: { sessions: number; engagedSessions: number; keyEvents: number; revenue: number }
+  bySource: Ga4DimensionRow[]
+  byMedium: Ga4DimensionRow[]
+  byCampaign: Ga4DimensionRow[]
+  byLink: { link_id: number; sessions: number; keyEvents: number; revenue: number }[]
+  errors: { google_email: string; error: string }[]
+}
+
+/** Aggregate GA4 post-click data, joined to links by UTM. Same filters as getAnalytics. */
+export function getGa4Analytics(filters: AnalyticsFilters = {}) {
+  const params = new URLSearchParams()
+  if (filters.client_id) params.set('client_id', String(filters.client_id))
+  if (filters.source) params.set('source', filters.source)
+  if (filters.medium) params.set('medium', filters.medium)
+  if (filters.campaign) params.set('campaign', filters.campaign)
+  if (filters.from) params.set('from', filters.from)
+  if (filters.to) params.set('to', filters.to)
+  const query = params.toString()
+  return request<Ga4Aggregate>(`/api/v1/analytics/ga4${query ? `?${query}` : ''}`)
+}
+
+export interface Ga4LinkReport {
+  available: boolean
+  reason?: 'no_property' | 'no_connection' | 'no_utms' | 'error'
+  property_name?: string
+  totals?: { sessions: number; engagedSessions: number; keyEvents: number; revenue: number }
+  timeseries?: { day: string; sessions: number; keyEvents: number }[]
+  error?: string
+}
+
+/** Post-click GA4 metrics for one link (matched by its UTMs). */
+export function getLinkGa4(id: number, from?: string, to?: string) {
+  const params = new URLSearchParams()
+  if (from) params.set('from', from)
+  if (to) params.set('to', to)
+  const query = params.toString()
+  return request<Ga4LinkReport>(`/api/v1/links/${id}/ga4${query ? `?${query}` : ''}`)
+}

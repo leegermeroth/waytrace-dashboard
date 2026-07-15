@@ -10,11 +10,11 @@ import {
   XAxis,
   YAxis,
 } from 'recharts'
-import { deleteLink, getLinkHistory, getLinkStats, listLinks, type DestinationHistoryEntry, type Link, type LinkStats } from '@/lib/api'
-import { Button } from '@/components/ui/button'
+import { deleteLink, getLinkGa4, getLinkHistory, getLinkStats, listLinks, type DestinationHistoryEntry, type Ga4LinkReport, type Link, type LinkStats } from '@/lib/api'
+import { Button, buttonVariants } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Alert, AlertDescription } from '@/components/ui/alert'
-import { PageHeader } from '@/components/brand'
+import { PageHeader, StatCard } from '@/components/brand'
 import { QrDialog } from '@/components/QrDialog'
 import { buildTrackingUrl, scanUrl, shortUrl } from '@/lib/links'
 
@@ -38,6 +38,7 @@ export default function LinkDetail() {
   const navigate = useNavigate()
   const [link, setLink] = useState<Link | null>(null)
   const [stats, setStats] = useState<LinkStats | null>(null)
+  const [ga4, setGa4] = useState<Ga4LinkReport | null>(null)
   const [history, setHistory] = useState<DestinationHistoryEntry[]>([])
   const [error, setError] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(true)
@@ -60,6 +61,10 @@ export default function LinkDetail() {
       })
       .catch((err) => setError(err instanceof Error ? err.message : 'Failed to load link'))
       .finally(() => setIsLoading(false))
+    // GA4 is a slower best-effort side channel — never blocks the page.
+    getLinkGa4(Number(id))
+      .then(setGa4)
+      .catch(() => setGa4(null))
   }, [id])
 
   async function handleCopy() {
@@ -253,6 +258,8 @@ export default function LinkDetail() {
         </CardContent>
       </Card>
 
+      {ga4 && <Ga4LinkPanel ga4={ga4} />}
+
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <Card>
           <CardHeader>
@@ -326,5 +333,59 @@ export default function LinkDetail() {
         label={link.label || link.short_code}
       />
     </div>
+  )
+}
+
+/** Format GA4 revenue (property currency unknown — shown as USD, refine later). */
+function fmtRevenue(v: number): string {
+  return v.toLocaleString(undefined, { style: 'currency', currency: 'USD', maximumFractionDigits: 0 })
+}
+
+/** Post-click GA4 metrics for this link. Renders nothing on error / no UTMs. */
+function Ga4LinkPanel({ ga4 }: { ga4: Ga4LinkReport }) {
+  if (ga4.reason === 'error' || ga4.reason === 'no_utms') return null
+
+  // Workspace not mapped to a GA4 property — a quiet connect prompt.
+  if (!ga4.available) {
+    return (
+      <Card className="border-dashed">
+        <CardContent className="flex flex-col items-start gap-2 py-5">
+          <span className="eyebrow">Post-click · Google Analytics</span>
+          <p className="text-sm text-muted-foreground">
+            Connect this workspace to a GA4 property to see the sessions, key events, and revenue this link drove.
+          </p>
+          <RouterLink to="/dashboard/settings/integrations" className={buttonVariants({ variant: 'outline', size: 'sm' })}>
+            Connect Google Analytics
+          </RouterLink>
+        </CardContent>
+      </Card>
+    )
+  }
+
+  const t = ga4.totals ?? { sessions: 0, engagedSessions: 0, keyEvents: 0, revenue: 0 }
+  const empty = t.sessions === 0 && t.keyEvents === 0 && t.revenue === 0
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Post-click · Google Analytics</CardTitle>
+        <CardDescription>
+          Matched to this link's UTMs{ga4.property_name ? ` · ${ga4.property_name}` : ''}
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        {empty ? (
+          <p className="font-serif text-sm text-muted-foreground italic">
+            No GA4 sessions have matched this link's UTMs yet.
+          </p>
+        ) : (
+          <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+            <StatCard label="Sessions" value={t.sessions.toLocaleString()} />
+            <StatCard label="Engaged" value={t.engagedSessions.toLocaleString()} />
+            <StatCard label="Key events" value={t.keyEvents.toLocaleString()} />
+            <StatCard label="Revenue" value={fmtRevenue(t.revenue)} />
+          </div>
+        )}
+      </CardContent>
+    </Card>
   )
 }
