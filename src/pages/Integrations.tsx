@@ -7,10 +7,12 @@ import {
   getGa4AuthUrl,
   disconnectGa4,
   setWorkspaceGa4Property,
+  getPluginInfo,
   listClients,
   type Me,
   type Ga4Connection,
   type Ga4Property,
+  type PluginInfo,
   type Client,
 } from '@/lib/api'
 import { Button, buttonVariants } from '@/components/ui/button'
@@ -41,6 +43,7 @@ export default function Integrations() {
   const [properties, setProperties] = useState<Ga4Property[]>([])
   const [propertyErrors, setPropertyErrors] = useState<{ google_email: string; error: string }[]>([])
   const [clients, setClients] = useState<Client[]>([])
+  const [plugin, setPlugin] = useState<PluginInfo | null>(null)
   const [loadError, setLoadError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
 
@@ -78,15 +81,19 @@ export default function Integrations() {
         setLoading(false)
         return
       }
-      const [conns, props, cls] = await Promise.all([
+      const [conns, props, cls, pluginInfo] = await Promise.all([
         getGa4Connections(),
         getGa4Properties(),
         listClients(),
+        // Plugin download is owner-only (its token auth accepts account tokens,
+        // not invited-user tokens); returns null for ineligible accounts.
+        meData.api_token ? getPluginInfo().catch(() => null) : Promise.resolve(null),
       ])
       setConnections(conns)
       setProperties(props.properties)
       setPropertyErrors(props.errors)
       setClients(cls)
+      setPlugin(pluginInfo)
     } catch (err) {
       setLoadError(err instanceof Error ? err.message : 'Failed to load integrations')
     } finally {
@@ -189,7 +196,7 @@ export default function Integrations() {
       <PageHeader
         eyebrow="Account"
         title="Integrations"
-        description="Connect Google Analytics to see post-click performance alongside your clicks and scans."
+        description="Bring Waytrace into WordPress, and connect Google Analytics for post-click performance."
       />
 
       {banner && (
@@ -201,6 +208,28 @@ export default function Integrations() {
         <Alert variant="destructive">
           <AlertDescription>{loadError}</AlertDescription>
         </Alert>
+      )}
+
+      {/* WordPress plugin */}
+      {plugin && (
+        <Card className="max-w-2xl">
+          <CardHeader>
+            <CardTitle>WordPress plugin</CardTitle>
+            <CardDescription>Build and manage your tracking links without leaving WordPress.</CardDescription>
+          </CardHeader>
+          <CardContent className="flex flex-col gap-4">
+            <p className="text-sm text-muted-foreground">
+              Install the Waytrace plugin and sign in with this same account — your workspaces, links, and
+              campaign data all appear right inside your WordPress admin. Nothing to re-enter, and it stays in sync.
+            </p>
+            <a href={plugin.download_url} className={`${buttonVariants()} w-fit`}>
+              Download plugin · v{plugin.version}
+            </a>
+            <p className="mono text-[0.7rem] leading-relaxed text-slate">
+              In WordPress: Plugins → Add New → Upload Plugin → choose the .zip → Activate → connect with your Waytrace email and password.
+            </p>
+          </CardContent>
+        </Card>
       )}
 
       {/* Connected Google logins */}

@@ -501,6 +501,23 @@ export function getAnalytics(filters: AnalyticsFilters = {}) {
   return request<Analytics>(`/api/v1/analytics${query ? `?${query}` : ''}`)
 }
 
+// ── WordPress plugin download ────────────────────────────────────────────────
+
+export interface PluginInfo {
+  version: string
+  min_wp_version: string | null
+  min_php_version: string | null
+  tested_wp_version: string | null
+  changelog: string | null
+  // Pre-built, token-authenticated download URL for the current release zip.
+  download_url: string
+}
+
+/** Current waytrace-pro release for this account (null if ineligible / no release). */
+export function getPluginInfo() {
+  return request<PluginInfo | null>('/api/v1/updates/waytrace-pro')
+}
+
 // ── GA4 integration (v1.23) ──────────────────────────────────────────────────
 
 export interface Ga4Connection {
