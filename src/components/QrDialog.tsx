@@ -197,7 +197,7 @@ export function QrDialog({ open, onOpenChange, url, label }: Props) {
 
         {error && <p className="text-xs text-destructive">{error}</p>}
 
-        <div className="dot-grid-well flex aspect-square max-h-64 items-center justify-center rounded-md border border-border [&>canvas]:h-56 [&>canvas]:w-56">
+        <div className="dot-grid-well mx-auto flex w-fit items-center justify-center rounded-md border border-border p-4 [&_canvas]:h-56 [&_canvas]:w-56">
           <div ref={containerRef} className="flex items-center justify-center" />
         </div>
 
