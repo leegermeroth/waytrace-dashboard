@@ -59,6 +59,7 @@ interface SavedStyle {
   dotStyle: DotStyle
   cornerStyle: CornerStyle
   logo: string | null
+  size: number
 }
 
 const DEFAULT_STYLE: SavedStyle = {
@@ -67,7 +68,14 @@ const DEFAULT_STYLE: SavedStyle = {
   dotStyle: 'square',
   cornerStyle: 'square',
   logo: null,
+  size: 512,
 }
+
+// PNG export resolution bounds. 320 keeps the old default reachable; 2048 is
+// ample for print (e.g. ~6.8" at 300 DPI). SVG ignores this — it's vector.
+const SIZE_MIN = 256
+const SIZE_MAX = 2048
+const SIZE_STEP = 64
 
 function loadSavedStyle(): SavedStyle {
   try {
@@ -99,6 +107,7 @@ export function QrDialog({ open, onOpenChange, url, label }: Props) {
   const [dotStyle, setDotStyle] = useState<DotStyle>(initial.current.dotStyle)
   const [cornerStyle, setCornerStyle] = useState<CornerStyle>(initial.current.cornerStyle)
   const [logo, setLogo] = useState<string | null>(initial.current.logo)
+  const [size, setSize] = useState<number>(initial.current.size)
   const [error, setError] = useState<string | null>(null)
 
   const containerRef = useRef<HTMLDivElement | null>(null)
@@ -111,16 +120,22 @@ export function QrDialog({ open, onOpenChange, url, label }: Props) {
     const cornersDotType: 'square' | 'dot' = cornerStyle === 'square' ? 'square' : 'dot'
 
     return {
-      width: 320,
-      height: 320,
+      width: size,
+      height: size,
       type: 'canvas',
       data: url,
       image: logo ?? undefined,
-      margin: 8,
+      // Quiet zone + logo padding scale with the export size (both are px).
+      margin: Math.round(8 * (size / 320)),
       // A center logo obscures part of the code, so bump error correction to H
       // (30%) whenever a logo is present; otherwise M keeps the code less dense.
       qrOptions: { errorCorrectionLevel: logo ? 'H' : 'M' },
-      imageOptions: { hideBackgroundDots: true, imageSize: 0.35, margin: 6, crossOrigin: 'anonymous' },
+      imageOptions: {
+        hideBackgroundDots: true,
+        imageSize: 0.35,
+        margin: Math.round(6 * (size / 320)),
+        crossOrigin: 'anonymous',
+      },
       dotsOptions: { color: fgColor, type: dotStyle },
       backgroundOptions: { color: bgColor },
       cornersSquareOptions: { color: fgColor, type: cornersSquareType },
@@ -149,19 +164,19 @@ export function QrDialog({ open, onOpenChange, url, label }: Props) {
       setError(err instanceof Error ? err.message : 'Failed to generate QR code')
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, url, fgColor, bgColor, dotStyle, cornerStyle, logo])
+  }, [open, url, fgColor, bgColor, dotStyle, cornerStyle, logo, size])
 
   // Persist style choices (incl. the logo data URL) to localStorage.
   useEffect(() => {
     try {
       localStorage.setItem(
         STORAGE_KEY,
-        JSON.stringify({ fgColor, bgColor, dotStyle, cornerStyle, logo } satisfies SavedStyle),
+        JSON.stringify({ fgColor, bgColor, dotStyle, cornerStyle, logo, size } satisfies SavedStyle),
       )
     } catch {
       // Quota exceeded (e.g. very large logo) — non-fatal, just don't persist.
     }
-  }, [fgColor, bgColor, dotStyle, cornerStyle, logo])
+  }, [fgColor, bgColor, dotStyle, cornerStyle, logo, size])
 
   function onLogoChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
@@ -275,6 +290,26 @@ export function QrDialog({ open, onOpenChange, url, label }: Props) {
           </div>
           <p className="text-xs text-muted-foreground">
             Stored only in this browser — never uploaded. PNG or SVG, under 1 MB.
+          </p>
+        </div>
+
+        <div className="flex flex-col gap-2">
+          <div className="flex items-baseline justify-between">
+            <Label htmlFor="qr_size">PNG size</Label>
+            <span className="mono text-xs text-muted-foreground">{size} × {size} px</span>
+          </div>
+          <input
+            id="qr_size"
+            type="range"
+            min={SIZE_MIN}
+            max={SIZE_MAX}
+            step={SIZE_STEP}
+            value={size}
+            onChange={(e) => setSize(Number(e.target.value))}
+            className="w-full accent-[#A8772E]"
+          />
+          <p className="text-xs text-muted-foreground">
+            Higher = better for print. SVG is vector and stays sharp at any size.
           </p>
         </div>
 
