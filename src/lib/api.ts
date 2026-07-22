@@ -288,6 +288,9 @@ export interface Me {
   // The account's self-reported organization type (Agency, Ecommerce, …).
   // NULL until set during onboarding. Used for analytics + light suggestions.
   org_type: string | null
+  // 1 when this login may access the Platform Admin Console (/dashboard/platform/*).
+  // Always 0 for invited Team users — the flag belongs to the owner's login only.
+  is_platform_admin: number
   created_at: string
   // Present only when the caller is an invited Team user. Their presence is how
   // we tell an invited user apart from the account owner.
@@ -618,4 +621,70 @@ export function getLinkGa4(id: number, from?: string, to?: string) {
   if (to) params.set('to', to)
   const query = params.toString()
   return request<Ga4LinkReport>(`/api/v1/links/${id}/ga4${query ? `?${query}` : ''}`)
+}
+
+// ── Platform Admin Console (is_platform_admin only, v1.24) ───────────────────
+
+export interface AdminAccount {
+  id: number
+  name: string
+  email: string | null
+  tier: string
+  max_clients: number
+  subscription_status: string
+  is_platform_admin: number
+  is_active: number
+  created_at: string
+  client_count: number
+  link_count: number
+  total_clicks: number
+  total_scans: number
+  last_activity: string | null
+}
+
+export interface PlatformStats {
+  totals: {
+    accounts: number
+    active_subscriptions: number
+    workspaces: number
+    links: number
+    clicks: number
+    scans: number
+    domains: number
+  }
+  accounts_by_tier: { tier: string; count: number }[]
+}
+
+export interface ProvisionedAccount {
+  id: number
+  name: string
+  email: string
+  tier: string
+  max_clients: number
+  subscription_status: string
+  created_at: string
+  // False when the Worker couldn't send the setup email (missing Resend config).
+  email_sent: boolean
+}
+
+/** Create an Enterprise account (tier='enterprise') and send the setup-password email. */
+export function provisionEnterpriseAccount(input: { name: string; email: string; max_clients?: number }) {
+  return request<ProvisionedAccount>('/api/v1/admin/provision', {
+    method: 'POST',
+    body: JSON.stringify({
+      name: input.name,
+      email: input.email,
+      max_clients: input.max_clients ?? undefined,
+    }),
+  })
+}
+
+/** All accounts with per-account rollups (workspaces, links, hits, last activity). */
+export function listAdminAccounts() {
+  return request<AdminAccount[]>('/api/v1/admin/accounts')
+}
+
+/** Platform-wide totals. */
+export function getPlatformStats() {
+  return request<PlatformStats>('/api/v1/admin/stats')
 }

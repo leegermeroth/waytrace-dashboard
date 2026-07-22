@@ -2,6 +2,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { AuthProvider } from '@/context/AuthContext'
 import { ProtectedRoute } from '@/components/ProtectedRoute'
 import { AdminRoute } from '@/components/AdminRoute'
+import { PlatformRoute } from '@/components/PlatformRoute'
 import DashboardLayout from '@/components/DashboardLayout'
 import Login from '@/pages/Login'
 import Register from '@/pages/Register'
@@ -24,6 +25,9 @@ import TrackingFoundationSettings from '@/pages/TrackingFoundationSettings'
 import Users from '@/pages/Users'
 import Billing from '@/pages/Billing'
 import Domains from '@/pages/Domains'
+import PlatformProvision from '@/pages/PlatformProvision'
+import PlatformAccounts from '@/pages/PlatformAccounts'
+import PlatformStats from '@/pages/PlatformStats'
 
 export default function App() {
   return (
@@ -58,6 +62,12 @@ export default function App() {
                 <Route path="/dashboard/settings/users" element={<Users />} />
                 <Route path="/dashboard/billing" element={<Billing />} />
                 <Route path="/dashboard/domains" element={<Domains />} />
+              </Route>
+              {/* Platform Admin Console — is_platform_admin only. */}
+              <Route element={<PlatformRoute />}>
+                <Route path="/dashboard/platform/provision" element={<PlatformProvision />} />
+                <Route path="/dashboard/platform/accounts" element={<PlatformAccounts />} />
+                <Route path="/dashboard/platform/stats" element={<PlatformStats />} />
               </Route>
             </Route>
           </Route>

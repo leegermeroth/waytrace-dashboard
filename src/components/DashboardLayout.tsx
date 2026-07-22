@@ -21,6 +21,14 @@ const adminTrailingNavItems = [
   { to: '/dashboard/billing', label: 'Billing', end: false },
 ]
 
+// Platform Admin Console — rendered as its own labeled section, visible only
+// when the login's account has is_platform_admin = 1.
+const platformNavItems = [
+  { to: '/dashboard/platform/provision', label: 'Provision', end: false },
+  { to: '/dashboard/platform/accounts', label: 'Accounts', end: false },
+  { to: '/dashboard/platform/stats', label: 'Stats', end: false },
+]
+
 type NavItem = { to: string; label: string; end: boolean }
 
 function SidebarLink({ item }: { item: NavItem }) {
@@ -62,7 +70,7 @@ function TopNavLink({ item }: { item: NavItem }) {
 }
 
 export default function DashboardLayout() {
-  const { logout, tier, canAdminister } = useAuth()
+  const { logout, tier, canAdminister, isPlatformAdmin } = useAuth()
   const navigate = useNavigate()
 
   const navItems: NavItem[] = [
@@ -94,6 +102,14 @@ export default function DashboardLayout() {
           {navItems.map((item) => (
             <SidebarLink key={item.to} item={item} />
           ))}
+          {isPlatformAdmin && (
+            <>
+              <div className="eyebrow-sm mt-5 mb-1 px-4">Platform</div>
+              {platformNavItems.map((item) => (
+                <SidebarLink key={item.to} item={item} />
+              ))}
+            </>
+          )}
         </nav>
         <div className="border-t border-border p-4">
           <button
@@ -123,6 +139,8 @@ export default function DashboardLayout() {
           {navItems.map((item) => (
             <TopNavLink key={item.to} item={item} />
           ))}
+          {isPlatformAdmin &&
+            platformNavItems.map((item) => <TopNavLink key={item.to} item={item} />)}
         </nav>
       </header>
 

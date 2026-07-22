@@ -23,6 +23,12 @@ interface AuthState {
   tier: string | null
   subscriptionStatus: string | null
   role: Role | null
+  /**
+   * Platform Admin Console access (accounts.is_platform_admin). Persisted like
+   * role so the Platform nav doesn't flash on reload; /me re-syncs it
+   * authoritatively on mount. The Worker enforces the real gate.
+   */
+  isPlatformAdmin: boolean
 }
 
 interface AuthContextValue extends AuthState {
@@ -50,19 +56,28 @@ const STORAGE_KEY = 'waytrace_auth'
 
 const AuthContext = createContext<AuthContextValue | null>(null)
 
+const EMPTY_AUTH: AuthState = {
+  apiToken: null,
+  tier: null,
+  subscriptionStatus: null,
+  role: null,
+  isPlatformAdmin: false,
+}
+
 function loadStoredAuth(): AuthState {
   try {
     const raw = localStorage.getItem(STORAGE_KEY)
-    if (!raw) return { apiToken: null, tier: null, subscriptionStatus: null, role: null }
+    if (!raw) return EMPTY_AUTH
     const parsed = JSON.parse(raw)
     return {
       apiToken: parsed.apiToken ?? null,
       tier: parsed.tier ?? null,
       subscriptionStatus: parsed.subscriptionStatus ?? null,
       role: parsed.role ?? null,
+      isPlatformAdmin: parsed.isPlatformAdmin ?? false,
     }
   } catch {
-    return { apiToken: null, tier: null, subscriptionStatus: null, role: null }
+    return EMPTY_AUTH
   }
 }
 
@@ -86,6 +101,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // The Worker only returns `role` for invited Team users; an account owner
       // gets no role field and is treated as full admin.
       role: result.role ?? 'owner',
+      // Auth responses don't carry the platform flag — /me syncs it on mount.
+      isPlatformAdmin: false,
     })
   }, [persist])
 
@@ -96,6 +113,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       tier: result.tier,
       subscriptionStatus: result.subscription_status,
       role: 'owner',
+      isPlatformAdmin: false,
     })
   }, [persist])
 
@@ -106,6 +124,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       tier: result.tier,
       subscriptionStatus: result.subscription_status,
       role: 'owner',
+      isPlatformAdmin: false,
     })
   }, [persist])
 
@@ -116,6 +135,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       tier: result.tier,
       subscriptionStatus: result.subscription_status,
       role: 'owner',
+      isPlatformAdmin: false,
     })
   }, [persist])
 
@@ -126,12 +146,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       tier: result.tier,
       subscriptionStatus: result.subscription_status,
       role: result.role ?? 'contributor',
+      isPlatformAdmin: false,
     })
   }, [persist])
 
   const logout = useCallback(() => {
     localStorage.removeItem(STORAGE_KEY)
-    setAuth({ apiToken: null, tier: null, subscriptionStatus: null, role: null })
+    setAuth(EMPTY_AUTH)
     setOnboardedAt(undefined)
   }, [])
 
@@ -157,10 +178,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       .then((me) => {
         if (cancelled) return
         const role: Role = me.role ?? 'owner'
+        const isPlatformAdmin = me.is_platform_admin === 1
         setOnboardedAt(me.onboarded_at ?? null)
         setAuth((prev) => {
-          if (prev.role === role && prev.tier === me.tier) return prev
-          const next = { ...prev, role, tier: me.tier }
+          if (prev.role === role && prev.tier === me.tier && prev.isPlatformAdmin === isPlatformAdmin) return prev
+          const next = { ...prev, role, tier: me.tier, isPlatformAdmin }
           localStorage.setItem(STORAGE_KEY, JSON.stringify(next))
           return next
         })
