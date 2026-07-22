@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState, type FormEvent } from 'react'
 import { Link as RouterLink, useNavigate, useParams } from 'react-router-dom'
 import { Check, Copy, QrCode as QrIcon } from 'lucide-react'
 import {
@@ -10,13 +10,48 @@ import {
   XAxis,
   YAxis,
 } from 'recharts'
-import { deleteLink, getLinkGa4, getLinkHistory, getLinkStats, listLinks, type DestinationHistoryEntry, type Ga4LinkReport, type Link, type LinkStats } from '@/lib/api'
+import {
+  createVariant,
+  deleteLink,
+  deleteVariant,
+  getLinkGa4,
+  getLinkHistory,
+  getLinkStats,
+  getVariantStats,
+  listLinks,
+  updateVariant,
+  type DestinationHistoryEntry,
+  type Ga4DimensionRow,
+  type Ga4LinkReport,
+  type Link,
+  type LinkStats,
+  type VariantWithStats,
+} from '@/lib/api'
+import { useAuth } from '@/context/AuthContext'
 import { Button, buttonVariants } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Alert, AlertDescription } from '@/components/ui/alert'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
 import { PageHeader, StatCard } from '@/components/brand'
 import { QrDialog } from '@/components/QrDialog'
-import { buildTrackingUrl, scanUrl, shortUrl } from '@/lib/links'
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
+import { buildTrackingUrl, normalizeDestinationUrl, scanUrl, shortUrl } from '@/lib/links'
 
 /**
  * The Worker only started rejecting non-http(s) destination_url values
@@ -260,6 +295,8 @@ export default function LinkDetail() {
 
       {ga4 && <Ga4LinkPanel ga4={ga4} />}
 
+      <VariantsPanel linkId={link.id} />
+
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <Card>
           <CardHeader>
@@ -339,6 +376,377 @@ export default function LinkDetail() {
 /** Format GA4 revenue (property currency unknown — shown as USD, refine later). */
 function fmtRevenue(v: number): string {
   return v.toLocaleString(undefined, { style: 'currency', currency: 'USD', maximumFractionDigits: 0 })
+}
+
+/** Same http(s) check the Worker applies — catch it in the dialog, not on submit. */
+function validateVariantUrl(value: string): string | null {
+  try {
+    const u = new URL(normalizeDestinationUrl(value))
+    return u.protocol === 'http:' || u.protocol === 'https:' ? null : 'Must be an http(s) URL'
+  } catch {
+    return 'Not a valid URL'
+  }
+}
+
+/**
+ * A/B testing panel (enterprise, v1.27). Lists the link's weighted destination
+ * variants with per-variant hit stats (clicks / scans from
+ * link_clicks.variant_id) and, when GA4 is connected, per-variant sessions/
+ * key events/revenue joined on the variant's utm_content stamp
+ * (sessionManualAdContent). Weight shows as its effective % of the active
+ * total. While any variant is active, the link's utm_content field is locked
+ * (the Worker rejects edits; LinkForm disables the input).
+ *
+ * Gate mirrors the Worker: enterprise tier only (panel simply doesn't render
+ * otherwise); contributors see it read-only.
+ */
+function VariantsPanel({ linkId }: { linkId: number }) {
+  const { isEnterprise, canAdminister } = useAuth()
+  const [variants, setVariants] = useState<VariantWithStats[]>([])
+  const [noVariant, setNoVariant] = useState<{ clicks: number; scans: number } | null>(null)
+  const [ga4ByStamp, setGa4ByStamp] = useState<Map<string, Ga4DimensionRow> | null>(null)
+  const [loaded, setLoaded] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [dialogOpen, setDialogOpen] = useState(false)
+  const [editing, setEditing] = useState<VariantWithStats | null>(null)
+
+  const refresh = useCallback(() => {
+    getVariantStats(linkId)
+      .then((stats) => {
+        setVariants(stats.variants)
+        setNoVariant(stats.no_variant)
+        setLoaded(true)
+      })
+      .catch(() => setLoaded(false)) // non-enterprise 403 etc. — hide the panel
+  }, [linkId])
+
+  useEffect(() => {
+    if (isEnterprise) refresh()
+  }, [isEnterprise, refresh])
+
+  // GA4 per-variant is a slower best-effort side channel, only worth a round
+  // trip once we know variants exist.
+  useEffect(() => {
+    if (!loaded || variants.length === 0) return
+    getLinkGa4(linkId, undefined, undefined, 'variant')
+      .then((report) => {
+        if (report.available && report.byContent) {
+          setGa4ByStamp(new Map(report.byContent.map((r) => [r.key, r])))
+        }
+      })
+      .catch(() => setGa4ByStamp(null))
+    // Re-fetch only when the variant set changes size (a new stamp may exist).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loaded, variants.length, linkId])
+
+  if (!isEnterprise || !loaded) return null
+
+  const activeTotal = variants.filter((v) => v.is_active === 1).reduce((s, v) => s + v.weight, 0)
+  const showGa4 = ga4ByStamp !== null
+  const showRemainder =
+    noVariant !== null && variants.length > 0 && noVariant.clicks + noVariant.scans > 0
+
+  async function handleDelete(v: VariantWithStats) {
+    if (!confirm(`Delete variant "${v.label}"? Its hits stay counted under "No variant".`)) return
+    try {
+      await deleteVariant(linkId, v.id)
+      refresh()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to delete variant')
+    }
+  }
+
+  async function handleToggleActive(v: VariantWithStats) {
+    try {
+      await updateVariant(linkId, v.id, { is_active: v.is_active !== 1 })
+      refresh()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to update variant')
+    }
+  }
+
+  return (
+    <Card>
+      <CardHeader>
+        <div className="flex flex-wrap items-start justify-between gap-2">
+          <div className="flex flex-col gap-1.5">
+            <CardTitle>A/B testing</CardTitle>
+            <CardDescription>
+              Weighted destination variants. Each hit picks a variant by weight and stamps its
+              content tag, so GA4 splits results per variant automatically.
+            </CardDescription>
+          </div>
+          {canAdminister && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                setEditing(null)
+                setDialogOpen(true)
+              }}
+            >
+              Add variant
+            </Button>
+          )}
+        </div>
+      </CardHeader>
+      <CardContent>
+        {error && (
+          <Alert variant="destructive" className="mb-3">
+            <AlertDescription>{error}</AlertDescription>
+          </Alert>
+        )}
+
+        {variants.length === 0 ? (
+          <p className="font-serif text-sm text-muted-foreground italic">
+            No variants yet. Add two or more to split this link's traffic between destinations.
+          </p>
+        ) : (
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Variant</TableHead>
+                  <TableHead>Destination</TableHead>
+                  <TableHead className="text-right">Split</TableHead>
+                  <TableHead>Content tag</TableHead>
+                  <TableHead className="text-right">Clicks</TableHead>
+                  <TableHead className="text-right">Scans</TableHead>
+                  {showGa4 && <TableHead className="text-right">Sessions</TableHead>}
+                  {showGa4 && <TableHead className="text-right">Key events</TableHead>}
+                  {showGa4 && <TableHead className="text-right">Revenue</TableHead>}
+                  {canAdminister && <TableHead />}
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {variants.map((v) => {
+                  const ga4Row = ga4ByStamp?.get(v.utm_content)
+                  const pct =
+                    v.is_active === 1 && activeTotal > 0
+                      ? `${Math.round((v.weight / activeTotal) * 100)}%`
+                      : '—'
+                  return (
+                    <TableRow key={v.id} className={v.is_active !== 1 ? 'opacity-50' : undefined}>
+                      <TableCell className="font-medium">
+                        {v.label}
+                        {v.is_active !== 1 && (
+                          <span className="ml-1.5 text-xs text-muted-foreground">(paused)</span>
+                        )}
+                      </TableCell>
+                      <TableCell className="mono max-w-56 truncate text-xs text-muted-foreground">
+                        {v.destination_url}
+                      </TableCell>
+                      <TableCell className="mono text-right" title={`weight ${v.weight}`}>
+                        {pct}
+                      </TableCell>
+                      <TableCell className="mono text-xs text-muted-foreground">
+                        {v.utm_content}
+                      </TableCell>
+                      <TableCell className="mono text-right">{v.clicks}</TableCell>
+                      <TableCell className="mono text-right">{v.scans}</TableCell>
+                      {showGa4 && (
+                        <TableCell className="mono text-right">
+                          {(ga4Row?.sessions ?? 0).toLocaleString()}
+                        </TableCell>
+                      )}
+                      {showGa4 && (
+                        <TableCell className="mono text-right">
+                          {(ga4Row?.keyEvents ?? 0).toLocaleString()}
+                        </TableCell>
+                      )}
+                      {showGa4 && (
+                        <TableCell className="mono text-right">
+                          {fmtRevenue(ga4Row?.revenue ?? 0)}
+                        </TableCell>
+                      )}
+                      {canAdminister && (
+                        <TableCell className="text-right whitespace-nowrap">
+                          <Button variant="ghost" size="sm" onClick={() => handleToggleActive(v)}>
+                            {v.is_active === 1 ? 'Pause' : 'Resume'}
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => {
+                              setEditing(v)
+                              setDialogOpen(true)
+                            }}
+                          >
+                            Edit
+                          </Button>
+                          <Button variant="destructive-ghost" size="sm" onClick={() => handleDelete(v)}>
+                            Delete
+                          </Button>
+                        </TableCell>
+                      )}
+                    </TableRow>
+                  )
+                })}
+                {showRemainder && noVariant && (
+                  <TableRow>
+                    <TableCell className="text-muted-foreground italic">No variant</TableCell>
+                    <TableCell className="text-xs text-muted-foreground">
+                      Hits before A/B, while paused, or from deleted variants
+                    </TableCell>
+                    <TableCell className="text-right">—</TableCell>
+                    <TableCell>—</TableCell>
+                    <TableCell className="mono text-right">{noVariant.clicks}</TableCell>
+                    <TableCell className="mono text-right">{noVariant.scans}</TableCell>
+                    {showGa4 && <TableCell className="text-right">—</TableCell>}
+                    {showGa4 && <TableCell className="text-right">—</TableCell>}
+                    {showGa4 && <TableCell className="text-right">—</TableCell>}
+                    {canAdminister && <TableCell />}
+                  </TableRow>
+                )}
+              </TableBody>
+            </Table>
+          </div>
+        )}
+
+        {variants.some((v) => v.is_active === 1) && (
+          <p className="mt-3 text-xs text-muted-foreground">
+            While variants are active, this link's UTM Content is managed by A/B testing — the
+            variant's content tag is stamped on every redirect.
+          </p>
+        )}
+      </CardContent>
+
+      <VariantDialog
+        key={editing?.id ?? 'new'}
+        open={dialogOpen}
+        onOpenChange={setDialogOpen}
+        linkId={linkId}
+        variant={editing}
+        onSaved={() => {
+          setDialogOpen(false)
+          refresh()
+        }}
+      />
+    </Card>
+  )
+}
+
+/** Add/edit dialog. The utm_content stamp is server-generated and immutable. */
+function VariantDialog({
+  open,
+  onOpenChange,
+  linkId,
+  variant,
+  onSaved,
+}: {
+  open: boolean
+  onOpenChange: (open: boolean) => void
+  linkId: number
+  variant: VariantWithStats | null
+  onSaved: () => void
+}) {
+  const [label, setLabel] = useState(variant?.label ?? '')
+  const [destination, setDestination] = useState(variant?.destination_url ?? '')
+  const [weight, setWeight] = useState(String(variant?.weight ?? 50))
+  const [error, setError] = useState<string | null>(null)
+  const [isSubmitting, setIsSubmitting] = useState(false)
+
+  async function handleSubmit(e: FormEvent) {
+    e.preventDefault()
+    setError(null)
+
+    const urlError = validateVariantUrl(destination)
+    if (urlError) {
+      setError(urlError)
+      return
+    }
+    const weightNum = Number(weight)
+    if (!Number.isInteger(weightNum) || weightNum < 1) {
+      setError('Weight must be a positive whole number')
+      return
+    }
+
+    setIsSubmitting(true)
+    try {
+      const input = {
+        label: label.trim(),
+        destination_url: normalizeDestinationUrl(destination),
+        weight: weightNum,
+      }
+      if (variant) {
+        await updateVariant(linkId, variant.id, input)
+      } else {
+        await createVariant(linkId, input)
+      }
+      onSaved()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to save variant')
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>{variant ? `Edit variant — ${variant.label}` : 'Add variant'}</DialogTitle>
+          <DialogDescription>
+            {variant
+              ? `Content tag "${variant.utm_content}" is permanent — GA4 history joins on it.`
+              : 'A content tag (variant-a, variant-b, …) is assigned automatically and stamped on every redirect this variant serves.'}
+          </DialogDescription>
+        </DialogHeader>
+        <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+          {error && (
+            <Alert variant="destructive">
+              <AlertDescription>{error}</AlertDescription>
+            </Alert>
+          )}
+          <div className="flex flex-col gap-2">
+            <Label htmlFor="variant_label">Label</Label>
+            <Input
+              id="variant_label"
+              required
+              value={label}
+              onChange={(e) => setLabel(e.target.value)}
+              placeholder="Landing page A"
+            />
+          </div>
+          <div className="flex flex-col gap-2">
+            <Label htmlFor="variant_destination">Destination URL</Label>
+            <Input
+              id="variant_destination"
+              type="text"
+              inputMode="url"
+              required
+              value={destination}
+              onChange={(e) => setDestination(e.target.value)}
+              placeholder="example.com/landing-a"
+            />
+          </div>
+          <div className="flex flex-col gap-2">
+            <Label htmlFor="variant_weight">Weight</Label>
+            <Input
+              id="variant_weight"
+              type="number"
+              min={1}
+              step={1}
+              required
+              value={weight}
+              onChange={(e) => setWeight(e.target.value)}
+            />
+            <p className="text-xs text-muted-foreground">
+              Relative share — a 80 / 20 pair sends ~80% of hits to the first variant.
+            </p>
+          </div>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+              Cancel
+            </Button>
+            <Button type="submit" disabled={isSubmitting}>
+              {isSubmitting ? 'Saving…' : variant ? 'Save changes' : 'Add variant'}
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  )
 }
 
 /** Post-click GA4 metrics for this link. Renders nothing on error / no UTMs. */

@@ -611,16 +611,97 @@ export interface Ga4LinkReport {
   property_name?: string
   totals?: { sessions: number; engagedSessions: number; keyEvents: number; revenue: number }
   timeseries?: { day: string; sessions: number; keyEvents: number }[]
+  // Present only on by='variant' requests: the same utm_id join disaggregated
+  // by utm_content (GA4 sessionManualAdContent) — keys are variant stamps.
+  byContent?: Ga4DimensionRow[]
   error?: string
 }
 
-/** Post-click GA4 metrics for one link (matched by its UTMs). */
-export function getLinkGa4(id: number, from?: string, to?: string) {
+/**
+ * Post-click GA4 metrics for one link (matched by its stamped utm_id).
+ * by='variant' swaps the daily timeseries for a per-utm_content breakdown
+ * (the A/B panel's GA4 columns).
+ */
+export function getLinkGa4(id: number, from?: string, to?: string, by?: 'variant') {
   const params = new URLSearchParams()
   if (from) params.set('from', from)
   if (to) params.set('to', to)
+  if (by) params.set('by', by)
   const query = params.toString()
   return request<Ga4LinkReport>(`/api/v1/links/${id}/ga4${query ? `?${query}` : ''}`)
+}
+
+// ── A/B testing: weighted destination variants (enterprise, v1.27) ───────────
+// A link with active variants redirects each hit to a weighted-random variant's
+// destination_url, stamping the variant's auto-generated utm_content in place
+// of the link's own (utm_id stays the link's ga4_id — utm_content is the GA4
+// disaggregator). Stamps are immutable once created; deleting/deactivating all
+// variants restores normal link behavior automatically. Enterprise-only, same
+// Worker gate as collections; contributors are read-only.
+
+export interface LinkVariant {
+  id: number
+  link_id: number
+  label: string
+  destination_url: string
+  // Relative weight (positive integer, not %-validated) — effective share =
+  // weight / sum of active variants' weights.
+  weight: number
+  // Auto-generated stamp ('variant-a', …), unique per link, immutable.
+  utm_content: string
+  is_active: number
+  created_at: string
+}
+
+export interface VariantWithStats extends LinkVariant {
+  clicks: number
+  scans: number
+  // NFC share of scans (via='nfc'), mirroring the collections taps split.
+  taps: number
+}
+
+export interface VariantStats {
+  variants: VariantWithStats[]
+  // Hits with no variant attribution: pre-A/B history, hits while no variant
+  // was active, and hits whose variant has since been deleted.
+  no_variant: { clicks: number; scans: number; taps: number }
+}
+
+export interface VariantInput {
+  label: string
+  destination_url: string
+  weight?: number
+  is_active?: boolean
+}
+
+export function listVariants(linkId: number) {
+  return request<LinkVariant[]>(`/api/v1/links/${linkId}/variants`)
+}
+
+/** The utm_content stamp is generated server-side and cannot be supplied. */
+export function createVariant(linkId: number, input: VariantInput) {
+  return request<LinkVariant>(`/api/v1/links/${linkId}/variants`, {
+    method: 'POST',
+    body: JSON.stringify(input),
+  })
+}
+
+export function updateVariant(linkId: number, variantId: number, input: Partial<VariantInput>) {
+  return request<LinkVariant>(`/api/v1/links/${linkId}/variants/${variantId}`, {
+    method: 'PUT',
+    body: JSON.stringify(input),
+  })
+}
+
+export function deleteVariant(linkId: number, variantId: number) {
+  return request<{ id: number }>(`/api/v1/links/${linkId}/variants/${variantId}`, {
+    method: 'DELETE',
+  })
+}
+
+/** Per-variant clicks/scans/taps from link_clicks.variant_id + the remainder. */
+export function getVariantStats(linkId: number) {
+  return request<VariantStats>(`/api/v1/links/${linkId}/variants/stats`)
 }
 
 // ── Asset collections (enterprise tier, v1.26) ───────────────────────────────

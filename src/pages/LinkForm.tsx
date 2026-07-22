@@ -3,6 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom'
 import {
   listClients,
   listLinks,
+  listVariants,
   updateLink,
   type Client,
   type Link,
@@ -49,6 +50,11 @@ function EditLinkForm({ id }: { id: string }) {
   const [isLoading, setIsLoading] = useState(true)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  // A/B lock (v1.27): while the link has active variants, the redirect stamps
+  // each variant's own utm_content and the Worker rejects edits to the link's
+  // stored value — so the field is disabled with a notice. Best-effort fetch:
+  // non-enterprise accounts 403 on the variants route and simply stay unlocked.
+  const [abLocked, setAbLocked] = useState(false)
 
   useEffect(() => {
     async function load() {
@@ -71,6 +77,9 @@ function EditLinkForm({ id }: { id: string }) {
     }
 
     load()
+    listVariants(Number(id))
+      .then((variants) => setAbLocked(variants.some((v) => v.is_active === 1)))
+      .catch(() => setAbLocked(false))
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id])
 
@@ -214,15 +223,25 @@ function EditLinkForm({ id }: { id: string }) {
                 value={utmTerm}
                 onChange={setUtmTerm}
               />
-              <UtmCombobox
-                id="utm_content"
-                label="UTM Content"
-                clientId={clientId ? Number(clientId) : null}
-                field="utm_content"
-                value={utmContent}
-                onChange={setUtmContent}
-                placeholder="hero-button"
-              />
+              {abLocked ? (
+                <div className="flex flex-col gap-2">
+                  <Label htmlFor="utm_content">UTM Content</Label>
+                  <Input id="utm_content" value={utmContent} disabled />
+                  <p className="text-xs text-muted-foreground">
+                    Content is managed by A/B testing — each variant stamps its own content tag.
+                  </p>
+                </div>
+              ) : (
+                <UtmCombobox
+                  id="utm_content"
+                  label="UTM Content"
+                  clientId={clientId ? Number(clientId) : null}
+                  field="utm_content"
+                  value={utmContent}
+                  onChange={setUtmContent}
+                  placeholder="hero-button"
+                />
+              )}
             </div>
 
             <div className="flex gap-2">
