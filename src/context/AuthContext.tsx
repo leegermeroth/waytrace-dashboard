@@ -37,6 +37,12 @@ interface AuthContextValue extends AuthState {
   canAdminister: boolean
   isContributor: boolean
   /**
+   * Enterprise tier (admin-provisioned, never via Stripe checkout). Gates the
+   * Packaging (and later Team Cards) nav + pages. The Worker enforces the real
+   * gate on every /api/v1/collections* call.
+   */
+  isEnterprise: boolean
+  /**
    * True once /me confirms this is the account owner and the one-time onboarding
    * flag is unset. Undefined onboarding state (not yet loaded) reads as false, so
    * the wizard never flashes before /me resolves.
@@ -213,6 +219,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         isAuthenticated: Boolean(auth.apiToken),
         canAdminister: effectiveRole === 'owner' || effectiveRole === 'admin',
         isContributor: effectiveRole === 'contributor',
+        isEnterprise: auth.tier === 'enterprise',
         needsOnboarding,
         markOnboarded,
         login,

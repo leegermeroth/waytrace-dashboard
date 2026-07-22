@@ -25,6 +25,8 @@ import TrackingFoundationSettings from '@/pages/TrackingFoundationSettings'
 import Users from '@/pages/Users'
 import Billing from '@/pages/Billing'
 import Domains from '@/pages/Domains'
+import Packaging from '@/pages/Packaging'
+import PackagingDetail from '@/pages/PackagingDetail'
 import PlatformProvision from '@/pages/PlatformProvision'
 import PlatformAccounts from '@/pages/PlatformAccounts'
 import PlatformStats from '@/pages/PlatformStats'
@@ -54,6 +56,10 @@ export default function App() {
               <Route path="/dashboard/links/:id" element={<LinkDetail />} />
               <Route path="/dashboard/links/:id/edit" element={<LinkForm />} />
               <Route path="/dashboard/settings" element={<Settings />} />
+              {/* Enterprise asset collections — contributors get read-only access
+                  (pages hide write actions; the Worker enforces the real gate). */}
+              <Route path="/dashboard/packaging" element={<Packaging />} />
+              <Route path="/dashboard/packaging/:id" element={<PackagingDetail />} />
               {/* Owner/admin only — contributors are redirected to /dashboard. */}
               <Route element={<AdminRoute />}>
                 <Route path="/dashboard/clients" element={<Clients />} />

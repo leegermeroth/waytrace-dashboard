@@ -623,6 +623,165 @@ export function getLinkGa4(id: number, from?: string, to?: string) {
   return request<Ga4LinkReport>(`/api/v1/links/${id}/ga4${query ? `?${query}` : ''}`)
 }
 
+// ── Asset collections (enterprise tier, v1.26) ───────────────────────────────
+// ONE collection engine behind two pages: Packaging (type='product') and Team
+// Cards (type='person', Session 4). An asset = one link + typed metadata; the
+// link's ga4_id is stamped from the SKU so GA4 sessions/revenue join per SKU.
+
+export interface AssetCollection {
+  id: number
+  client_id: number
+  name: string
+  type: 'product' | 'person'
+  created_at: string
+  client_name?: string
+  asset_count?: number
+}
+
+/** An asset row joined to its link (short link + clicks/scans counters). */
+export interface CollectionAsset {
+  id: number
+  collection_id: number
+  link_id: number
+  sku: string | null
+  product_name: string | null
+  variant: string | null
+  upc: string | null
+  person_name: string | null
+  person_slug: string | null
+  title: string | null
+  email: string | null
+  phone: string | null
+  destination_mode: 'redirect' | 'vcard'
+  created_at: string
+  updated_at: string
+  // Joined link fields
+  domain: string
+  short_code: string
+  destination_url: string
+  ga4_id: string | null
+  label: string | null
+  clicks: number
+  scans: number
+  is_active: number
+  utm_source: string | null
+  utm_medium: string | null
+  utm_campaign: string | null
+  utm_term: string | null
+  utm_content: string | null
+}
+
+export interface CollectionDetail extends AssetCollection {
+  assets: CollectionAsset[]
+}
+
+/** One product row for asset creation (single or bulk). */
+export interface AssetRowInput {
+  sku: string
+  product_name: string
+  variant?: string | null
+  upc?: string | null
+  destination_url: string
+}
+
+/** Per-row validation error from the bulk endpoint (row is 0-based). */
+export interface BulkRowError {
+  row: number
+  field?: string
+  message: string
+}
+
+/** Bulk import cap enforced by the Worker (D1 batch limits — 2 statements/row). */
+export const BULK_ROW_CAP = 200
+
+export function listCollections(clientId?: number) {
+  const query = clientId ? `?client_id=${clientId}` : ''
+  return request<AssetCollection[]>(`/api/v1/collections${query}`)
+}
+
+export function createCollection(input: { client_id: number; name: string; type?: 'product' }) {
+  return request<AssetCollection>('/api/v1/collections', {
+    method: 'POST',
+    body: JSON.stringify({ client_id: input.client_id, name: input.name, type: input.type ?? 'product' }),
+  })
+}
+
+export function getCollection(id: number) {
+  return request<CollectionDetail>(`/api/v1/collections/${id}`)
+}
+
+export function renameCollection(id: number, name: string) {
+  return request<AssetCollection>(`/api/v1/collections/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify({ name }),
+  })
+}
+
+/** Deletes the collection AND all its assets' links (they stop resolving). */
+export function deleteCollection(id: number) {
+  return request<{ id: number }>(`/api/v1/collections/${id}`, { method: 'DELETE' })
+}
+
+export function createAsset(
+  collectionId: number,
+  input: AssetRowInput & { utm_source?: string; utm_medium?: string; utm_campaign?: string }
+) {
+  return request<CollectionAsset>(`/api/v1/collections/${collectionId}/assets`, {
+    method: 'POST',
+    body: JSON.stringify(input),
+  })
+}
+
+/**
+ * All-or-nothing bulk create: every row is validated first; any invalid row
+ * fails the whole call with per-row errors (ApiError.status 400) and nothing
+ * is created. Callers should surface `errors` from the failure body — use
+ * bulkCreateAssets' thrown BulkValidationError.
+ */
+export class BulkValidationError extends ApiError {
+  errors: BulkRowError[]
+  constructor(message: string, status: number, errors: BulkRowError[]) {
+    super(message, status)
+    this.errors = errors
+  }
+}
+
+export async function bulkCreateAssets(
+  collectionId: number,
+  rows: AssetRowInput[],
+  utm?: { utm_source?: string; utm_medium?: string; utm_campaign?: string }
+): Promise<{ created: number; assets: CollectionAsset[] }> {
+  const res = await fetch(`${API_URL}/api/v1/collections/${collectionId}/assets/bulk`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...authHeaders() },
+    body: JSON.stringify({ rows, ...utm }),
+  })
+  const body = await res.json().catch(() => null) as
+    | { success: boolean; data?: { created: number; assets: CollectionAsset[] }; error?: string; errors?: BulkRowError[] }
+    | null
+  if (!res.ok || !body?.success || !body.data) {
+    const message = body?.error || `Request failed with status ${res.status}`
+    if (body?.errors?.length) throw new BulkValidationError(message, res.status, body.errors)
+    throw new ApiError(message, res.status)
+  }
+  return body.data
+}
+
+/** Edit an asset's product fields. A SKU change also re-stamps the link's ga4_id. */
+export function updateAsset(collectionId: number, assetId: number, input: Partial<AssetRowInput>) {
+  return request<CollectionAsset>(`/api/v1/collections/${collectionId}/assets/${assetId}`, {
+    method: 'PUT',
+    body: JSON.stringify(input),
+  })
+}
+
+/** Deletes the asset AND its link (the short link stops resolving). */
+export function deleteAsset(collectionId: number, assetId: number) {
+  return request<{ id: number }>(`/api/v1/collections/${collectionId}/assets/${assetId}`, {
+    method: 'DELETE',
+  })
+}
+
 // ── Platform Admin Console (is_platform_admin only, v1.24) ───────────────────
 
 export interface AdminAccount {
