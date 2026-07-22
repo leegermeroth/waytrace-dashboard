@@ -27,6 +27,8 @@ import Billing from '@/pages/Billing'
 import Domains from '@/pages/Domains'
 import Packaging from '@/pages/Packaging'
 import PackagingDetail from '@/pages/PackagingDetail'
+import Cards from '@/pages/Cards'
+import CardsDetail from '@/pages/CardsDetail'
 import PlatformProvision from '@/pages/PlatformProvision'
 import PlatformAccounts from '@/pages/PlatformAccounts'
 import PlatformStats from '@/pages/PlatformStats'
@@ -60,6 +62,8 @@ export default function App() {
                   (pages hide write actions; the Worker enforces the real gate). */}
               <Route path="/dashboard/packaging" element={<Packaging />} />
               <Route path="/dashboard/packaging/:id" element={<PackagingDetail />} />
+              <Route path="/dashboard/cards" element={<Cards />} />
+              <Route path="/dashboard/cards/:id" element={<CardsDetail />} />
               {/* Owner/admin only — contributors are redirected to /dashboard. */}
               <Route element={<AdminRoute />}>
                 <Route path="/dashboard/clients" element={<Clients />} />

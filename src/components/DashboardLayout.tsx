@@ -13,9 +13,10 @@ const baseNavItems = [
 
 const clientsNavItem = { to: '/dashboard/clients', label: 'Workspaces', end: false }
 
-// Enterprise-only: the asset-collection engine's product page. Contributors see
-// it too (read-only per existing role rules — the page hides write actions).
+// Enterprise-only: the asset-collection engine's two pages. Contributors see
+// them too (read-only per existing role rules — the pages hide write actions).
 const packagingNavItem = { to: '/dashboard/packaging', label: 'Packaging', end: false }
+const cardsNavItem = { to: '/dashboard/cards', label: 'Team Cards', end: false }
 
 // Settings is visible to everyone; the admin-only items are added conditionally.
 const settingsNavItem = { to: '/dashboard/settings', label: 'Settings', end: true }
@@ -79,7 +80,7 @@ export default function DashboardLayout() {
 
   const navItems: NavItem[] = [
     ...baseNavItems,
-    ...(isEnterprise ? [packagingNavItem] : []),
+    ...(isEnterprise ? [packagingNavItem, cardsNavItem] : []),
     // Workspaces is a Team feature and a management surface — owner/admin only.
     // Enterprise accounts have multi-workspace caps too.
     ...((tier === 'agency' || isEnterprise) && canAdminister ? [clientsNavItem] : []),

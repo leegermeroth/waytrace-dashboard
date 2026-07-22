@@ -20,6 +20,29 @@ export function scanUrl(link: Pick<Link, 'short_code' | 'domain'>): string {
 }
 
 /**
+ * The URL to write to an NFC chip: the short URL plus a `?nfc=1` marker. The
+ * Worker records hits on this URL with via='nfc' (a "tap"), counted into the
+ * same scans counter as QR but split out in the dashboard.
+ */
+export function nfcUrl(link: Pick<Link, 'short_code' | 'domain'>): string {
+  return `${shortUrl(link)}?nfc=1`
+}
+
+/**
+ * Slugify a person's name into a Worker-valid person_slug: lowercase runs of
+ * [a-z0-9] separated by single hyphens ("Katie Painter" -> "katie-painter").
+ * Diacritics are stripped so "José" becomes "jose", not "jos".
+ */
+export function slugify(name: string): string {
+  return name
+    .normalize('NFKD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+}
+
+/**
  * Prepend `https://` to a destination that was typed without a scheme, so
  * "example.com/page" is accepted instead of bounced by the Worker's http(s)
  * validation. Leaves an empty string, an existing http(s):// URL, or any other

@@ -50,6 +50,12 @@ export interface CsvImportProps {
   cap: number
   /** Rendered between the grid and the submit button (e.g. shared UTM fields). */
   extras?: ReactNode
+  /**
+   * Optional row normalizer, applied to each parsed CSV row and again to each
+   * row on submit (so hand-added rows are covered too) — e.g. Team Cards
+   * auto-slugifies a blank person_slug from person_name.
+   */
+  transformRow?: (values: Record<string, string>) => Record<string, string>
   /** Fires the bulk call. Throws BulkValidationError for per-row server errors. */
   onSubmit: (rows: Record<string, string>[]) => Promise<{ created: number }>
   /** Called after the results panel's "Done" (parent refreshes its grid). */
@@ -110,6 +116,7 @@ export function CsvImport({
   entityLabel,
   cap,
   extras,
+  transformRow,
   onSubmit,
   onDone,
   onCancel,
@@ -167,11 +174,12 @@ export function CsvImport({
     }
     setRows(
       dataRows.map((raw) => {
-        const values: Record<string, string> = {}
+        let values: Record<string, string> = {}
         for (const c of columns) {
           const idx = headers.indexOf(c.key)
           values[c.key] = idx >= 0 ? (raw[idx] ?? '').trim() : ''
         }
+        if (transformRow) values = transformRow(values)
         return { key: rowSeq++, values, serverErrors: [] }
       })
     )
@@ -233,7 +241,7 @@ export function CsvImport({
       const result = await onSubmit(rows.map((r) => {
         const out: Record<string, string> = {}
         for (const c of columns) out[c.key] = r.values[c.key]?.trim() ?? ''
-        return out
+        return transformRow ? transformRow(out) : out
       }))
       setCreatedCount(result.created)
     } catch (err) {

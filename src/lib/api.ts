@@ -626,7 +626,16 @@ export function getLinkGa4(id: number, from?: string, to?: string) {
 // ── Asset collections (enterprise tier, v1.26) ───────────────────────────────
 // ONE collection engine behind two pages: Packaging (type='product') and Team
 // Cards (type='person', Session 4). An asset = one link + typed metadata; the
-// link's ga4_id is stamped from the SKU so GA4 sessions/revenue join per SKU.
+// link's ga4_id is stamped from the SKU / person slug so GA4 sessions/revenue
+// join per SKU/person. Person assets carry destination_mode: 'redirect'
+// follows destination_url; 'vcard' serves a contact card at the short URL.
+
+/**
+ * What links.destination_url holds for a vcard-mode asset with no fallback URL
+ * (the Worker's placeholder — never actually served). Used to detect "no real
+ * destination yet" when toggling a card to redirect mode.
+ */
+export const VCARD_PLACEHOLDER_URL = 'https://waytrace.co/'
 
 export interface AssetCollection {
   id: number
@@ -662,7 +671,11 @@ export interface CollectionAsset {
   ga4_id: string | null
   label: string | null
   clicks: number
+  // QR + NFC hits combined (the Worker's one scans counter, §10 item 2)…
   scans: number
+  // …with the NFC share broken out (link_clicks.via='nfc'), so QR-only =
+  // scans - taps. Present on collection detail; absent on bulk-create results.
+  taps?: number
   is_active: number
   utm_source: string | null
   utm_medium: string | null
@@ -684,6 +697,22 @@ export interface AssetRowInput {
   destination_url: string
 }
 
+/**
+ * One person row (Team Cards). destination_mode is optional — the Worker
+ * honors an explicit value, else infers 'redirect' when destination_url is
+ * present and 'vcard' when it isn't. destination_url is required for redirect
+ * mode and an optional fallback for vcard mode.
+ */
+export interface PersonRowInput {
+  person_name: string
+  person_slug: string
+  title?: string | null
+  email?: string | null
+  phone?: string | null
+  destination_mode?: 'redirect' | 'vcard'
+  destination_url?: string | null
+}
+
 /** Per-row validation error from the bulk endpoint (row is 0-based). */
 export interface BulkRowError {
   row: number
@@ -699,7 +728,7 @@ export function listCollections(clientId?: number) {
   return request<AssetCollection[]>(`/api/v1/collections${query}`)
 }
 
-export function createCollection(input: { client_id: number; name: string; type?: 'product' }) {
+export function createCollection(input: { client_id: number; name: string; type?: 'product' | 'person' }) {
   return request<AssetCollection>('/api/v1/collections', {
     method: 'POST',
     body: JSON.stringify({ client_id: input.client_id, name: input.name, type: input.type ?? 'product' }),
@@ -724,7 +753,7 @@ export function deleteCollection(id: number) {
 
 export function createAsset(
   collectionId: number,
-  input: AssetRowInput & { utm_source?: string; utm_medium?: string; utm_campaign?: string }
+  input: (AssetRowInput | PersonRowInput) & { utm_source?: string; utm_medium?: string; utm_campaign?: string }
 ) {
   return request<CollectionAsset>(`/api/v1/collections/${collectionId}/assets`, {
     method: 'POST',
@@ -748,7 +777,7 @@ export class BulkValidationError extends ApiError {
 
 export async function bulkCreateAssets(
   collectionId: number,
-  rows: AssetRowInput[],
+  rows: (AssetRowInput | PersonRowInput)[],
   utm?: { utm_source?: string; utm_medium?: string; utm_campaign?: string }
 ): Promise<{ created: number; assets: CollectionAsset[] }> {
   const res = await fetch(`${API_URL}/api/v1/collections/${collectionId}/assets/bulk`, {
@@ -767,8 +796,16 @@ export async function bulkCreateAssets(
   return body.data
 }
 
-/** Edit an asset's product fields. A SKU change also re-stamps the link's ga4_id. */
-export function updateAsset(collectionId: number, assetId: number, input: Partial<AssetRowInput>) {
+/**
+ * Edit an asset's typed fields (product or person, per its collection's type).
+ * A SKU/slug change also re-stamps the link's ga4_id. destination_mode edits
+ * ride this endpoint; an explicit '' clears an optional person field.
+ */
+export function updateAsset(
+  collectionId: number,
+  assetId: number,
+  input: Partial<AssetRowInput> | Partial<PersonRowInput>
+) {
   return request<CollectionAsset>(`/api/v1/collections/${collectionId}/assets/${assetId}`, {
     method: 'PUT',
     body: JSON.stringify(input),
