@@ -1,3 +1,5 @@
+import * as React from "react"
+
 import { Button as ButtonPrimitive } from "@base-ui/react/button"
 import { cva, type VariantProps } from "class-variance-authority"
 
@@ -53,11 +55,23 @@ function Button({
   className,
   variant = "default",
   size = "default",
+  nativeButton,
+  render,
   ...props
 }: ButtonPrimitive.Props & VariantProps<typeof buttonVariants>) {
+  // Base UI defaults nativeButton to true, which logs a dev error when
+  // `render` swaps in a non-button element (e.g. a RouterLink). Infer it:
+  // only a real <button> render (or no render at all) is native.
+  const isNativeButton =
+    nativeButton ??
+    (render === undefined ||
+      (React.isValidElement(render) && render.type === "button"))
+
   return (
     <ButtonPrimitive
       data-slot="button"
+      nativeButton={isNativeButton}
+      render={render}
       className={cn(buttonVariants({ variant, size, className }))}
       {...props}
     />
