@@ -5,7 +5,9 @@ import {
   bulkCreateAssets,
   deleteAsset,
   getCollection,
+  getGa4Analytics,
   getLinkHistory,
+  listClients,
   renameCollection,
   updateAsset,
   updateLink,
@@ -14,11 +16,12 @@ import {
   type CollectionDetail,
   type DestinationHistoryEntry,
 } from '@/lib/api'
-import { normalizeDestinationUrl, scanUrl, shortUrl } from '@/lib/links'
+import { normalizeDestinationUrl, scanUrl, shortUrl, slugify } from '@/lib/links'
 import { useAuth } from '@/context/AuthContext'
 import { QrDialog } from '@/components/QrDialog'
+import { QrExportButton } from '@/components/QrExportButton'
 import { CsvImport, type CsvColumn } from '@/components/CsvImport'
-import { Button } from '@/components/ui/button'
+import { Button, buttonVariants } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Alert, AlertDescription } from '@/components/ui/alert'
@@ -63,12 +66,26 @@ const CSV_TEMPLATE_EXAMPLES = [
   ['SKYR-STR-5.3', 'Strawberry Skyr', '5.3 oz', '850016377029', 'https://example.com/products/strawberry-skyr'],
 ]
 
+function fmtRevenue(v: number): string {
+  return v.toLocaleString(undefined, { style: 'currency', currency: 'USD', maximumFractionDigits: 0 })
+}
+
+/** Per-link GA4 metrics for the grid columns, keyed by link_id. */
+interface Ga4Columns {
+  /** false = workspace has no GA4 property mapped (render the connect prompt). */
+  mapped: boolean
+  byLink: Map<number, { sessions: number; keyEvents: number; revenue: number }>
+}
+
 /**
  * Packaging collection detail: the SKU grid. Every row is one SKU = one
  * persistent short link (ga4_id = the SKU, so GA4 joins per SKU). CSV import
  * is all-or-nothing via the bulk endpoint. Destination edits go through the
  * existing link update endpoint (which records destination history).
- * GA4 columns and bulk QR export arrive with Session 6.
+ * GA4 Sessions/Key events/Revenue columns join the aggregate report's byLink
+ * (keyed on link_id — GA4 matches sessionCampaignId to the stamped SKU) when
+ * the workspace is mapped; "Export all QRs" zips one styled PNG per SKU
+ * client-side (QrExportButton).
  */
 export default function PackagingDetail() {
   const { id } = useParams()
@@ -89,6 +106,9 @@ export default function PackagingDetail() {
   const [copiedKey, setCopiedKey] = useState<string | null>(null)
   const [qrAsset, setQrAsset] = useState<CollectionAsset | null>(null)
   const [editAsset, setEditAsset] = useState<CollectionAsset | null>(null)
+  // null = GA4 data unavailable (still loading, or a report error) → no
+  // columns, no prompt, grid unchanged. Quiet degradation, like LinkDetail.
+  const [ga4, setGa4] = useState<Ga4Columns | null>(null)
 
   const refresh = useCallback(() => {
     getCollection(collectionId)
@@ -100,6 +120,38 @@ export default function PackagingDetail() {
   useEffect(() => {
     if (Number.isInteger(collectionId)) refresh()
   }, [collectionId, refresh])
+
+  // Per-SKU GA4 columns: the aggregate report's byLink already joins GA4
+  // sessions on links.ga4_id (= the SKU) exactly, so the grid join is a
+  // client-side Map lookup by link_id — no new Worker report pipeline.
+  // Unmapped workspace → columns stay hidden and a connect prompt renders
+  // below the grid; report errors → columns stay hidden, nothing else changes.
+  const clientId = collection?.client_id
+  useEffect(() => {
+    if (!clientId) return
+    let cancelled = false
+    ;(async () => {
+      try {
+        const clients = await listClients()
+        const workspace = clients.find((c) => c.id === clientId)
+        if (!workspace?.ga4_property_id || !workspace?.ga4_connection_id) {
+          if (!cancelled) setGa4({ mapped: false, byLink: new Map() })
+          return
+        }
+        const report = await getGa4Analytics({ client_id: clientId })
+        if (!cancelled)
+          setGa4({
+            mapped: true,
+            byLink: new Map(report.byLink.map((r) => [r.link_id, r])),
+          })
+      } catch {
+        if (!cancelled) setGa4(null)
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [clientId])
 
   async function copy(text: string, tag: string) {
     await navigator.clipboard.writeText(text)
@@ -143,6 +195,8 @@ export default function PackagingDetail() {
       clicks: assets.reduce((s, a) => s + a.clicks, 0),
     }
   }, [collection])
+
+  const showGa4 = ga4?.mapped === true
 
   if (isLoading) {
     return <p className="font-serif text-sm text-muted-foreground italic">Loading…</p>
@@ -238,6 +292,14 @@ export default function PackagingDetail() {
               <ArrowLeft className="size-4" />
               Back
             </Button>
+            {collection.assets.length > 0 && (
+              <QrExportButton
+                assets={collection.assets}
+                nameFor={(a) => a.sku}
+                zipName={`${slugify(collection.name) || 'packaging'}-qr-codes.zip`}
+                onError={setError}
+              />
+            )}
             {canAdminister && (
               <>
                 <Button variant="outline" onClick={handleRename}>
@@ -282,12 +344,19 @@ export default function PackagingDetail() {
                 <TableHead>Short link</TableHead>
                 <TableHead className="text-right">Scans</TableHead>
                 <TableHead className="text-right">Clicks</TableHead>
+                {showGa4 && <TableHead className="text-right">Sessions</TableHead>}
+                {showGa4 && <TableHead className="text-right">Key events</TableHead>}
+                {showGa4 && <TableHead className="text-right">Revenue</TableHead>}
                 <TableHead>Status</TableHead>
                 <TableHead className="text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {collection.assets.map((asset) => (
+              {collection.assets.map((asset) => {
+                // Absent from byLink = mapped but no GA4 sessions matched this
+                // SKU yet — a zero row, not an error.
+                const ga4Row = ga4?.byLink.get(asset.link_id)
+                return (
                 <TableRow key={asset.id}>
                   <TableCell className="mono text-xs font-medium">{asset.sku}</TableCell>
                   <TableCell>{asset.product_name}</TableCell>
@@ -308,6 +377,21 @@ export default function PackagingDetail() {
                   </TableCell>
                   <TableCell className="mono text-right text-xs">{asset.scans}</TableCell>
                   <TableCell className="mono text-right text-xs">{asset.clicks}</TableCell>
+                  {showGa4 && (
+                    <TableCell className="mono text-right text-xs">
+                      {(ga4Row?.sessions ?? 0).toLocaleString()}
+                    </TableCell>
+                  )}
+                  {showGa4 && (
+                    <TableCell className="mono text-right text-xs">
+                      {(ga4Row?.keyEvents ?? 0).toLocaleString()}
+                    </TableCell>
+                  )}
+                  {showGa4 && (
+                    <TableCell className="mono text-right text-xs">
+                      {fmtRevenue(ga4Row?.revenue ?? 0)}
+                    </TableCell>
+                  )}
                   <TableCell>
                     <StatusDot tone={asset.is_active ? 'success' : 'neutral'}>
                       {asset.is_active ? 'Live' : 'Off'}
@@ -335,9 +419,26 @@ export default function PackagingDetail() {
                     </div>
                   </TableCell>
                 </TableRow>
-              ))}
+                )
+              })}
             </TableBody>
           </Table>
+        </div>
+      )}
+
+      {ga4?.mapped === false && collection.assets.length > 0 && (
+        <div className="rounded-xl border border-dashed border-border bg-card p-5">
+          <span className="eyebrow">Post-click · Google Analytics</span>
+          <p className="mt-2 text-sm text-muted-foreground">
+            Connect this workspace to a GA4 property to see sessions, key events, and revenue per
+            SKU — each link's SKU is stamped as its GA4 Campaign ID automatically.
+          </p>
+          <RouterLink
+            to="/dashboard/settings/integrations"
+            className={`${buttonVariants({ variant: 'outline', size: 'sm' })} mt-3`}
+          >
+            Connect Google Analytics
+          </RouterLink>
         </div>
       )}
 

@@ -1,5 +1,17 @@
-import { useEffect, useRef, useState } from 'react'
-import QRCodeStyling, { type Options } from 'qr-code-styling'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import QRCodeStyling from 'qr-code-styling'
+import {
+  buildQrOptions,
+  loadSavedStyle,
+  LOGO_MAX_BYTES,
+  QR_STYLE_STORAGE_KEY,
+  SIZE_MAX,
+  SIZE_MIN,
+  SIZE_STEP,
+  type CornerStyle,
+  type DotStyle,
+  type SavedStyle,
+} from '@/lib/qr-style'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -27,9 +39,6 @@ interface Props {
   label?: string
 }
 
-type DotStyle = 'square' | 'rounded' | 'dots' | 'classy' | 'extra-rounded'
-type CornerStyle = 'square' | 'rounded' | 'dots'
-
 const DOT_STYLES: { value: DotStyle; label: string }[] = [
   { value: 'square', label: 'Square' },
   { value: 'rounded', label: 'Rounded' },
@@ -44,48 +53,8 @@ const CORNER_STYLES: { value: CornerStyle; label: string }[] = [
   { value: 'dots', label: 'Dots' },
 ]
 
-/**
- * Persisted QR style prefs live in localStorage (per-browser, never uploaded to
- * our servers). This lets a customization — including the center logo — carry
- * across every QR code the user generates on this browser, without any
- * server-side storage. Keyed alongside the existing `waytrace_auth` entry.
- */
-const STORAGE_KEY = 'waytrace_qr_style'
-const LOGO_MAX_BYTES = 1024 * 1024 // 1 MB — keeps the base64 blob well under the ~5 MB localStorage cap
-
-interface SavedStyle {
-  fgColor: string
-  bgColor: string
-  dotStyle: DotStyle
-  cornerStyle: CornerStyle
-  logo: string | null
-  size: number
-}
-
-const DEFAULT_STYLE: SavedStyle = {
-  fgColor: '#2C2820', // graphite, not pure black
-  bgColor: '#FFFFFF',
-  dotStyle: 'square',
-  cornerStyle: 'square',
-  logo: null,
-  size: 512,
-}
-
-// PNG export resolution bounds. 320 keeps the old default reachable; 2048 is
-// ample for print (e.g. ~6.8" at 300 DPI). SVG ignores this — it's vector.
-const SIZE_MIN = 256
-const SIZE_MAX = 2048
-const SIZE_STEP = 64
-
-function loadSavedStyle(): SavedStyle {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY)
-    if (!raw) return DEFAULT_STYLE
-    return { ...DEFAULT_STYLE, ...(JSON.parse(raw) as Partial<SavedStyle>) }
-  } catch {
-    return DEFAULT_STYLE
-  }
-}
+// Persisted style prefs (colors, pattern, corners, logo, size) are shared with
+// the bulk QR exporter — see src/lib/qr-style.ts for the storage contract.
 
 function slugForFile(label: string | undefined, url: string): string {
   const base = (label || url).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '')
@@ -114,41 +83,25 @@ export function QrDialog({ open, onOpenChange, url, label }: Props) {
   const qrRef = useRef<QRCodeStyling | null>(null)
   const fileInputRef = useRef<HTMLInputElement | null>(null)
 
-  function buildOptions(): Options {
-    const cornersSquareType: 'square' | 'extra-rounded' | 'dot' =
-      cornerStyle === 'rounded' ? 'extra-rounded' : cornerStyle === 'dots' ? 'dot' : 'square'
-    const cornersDotType: 'square' | 'dot' = cornerStyle === 'square' ? 'square' : 'dot'
-
-    return {
-      width: size,
-      height: size,
-      type: 'canvas',
-      data: url,
-      image: logo ?? undefined,
-      // Quiet zone + logo padding scale with the export size (both are px).
-      margin: Math.round(8 * (size / 320)),
-      // A center logo obscures part of the code, so bump error correction to H
-      // (30%) whenever a logo is present; otherwise M keeps the code less dense.
-      qrOptions: { errorCorrectionLevel: logo ? 'H' : 'M' },
-      imageOptions: {
-        hideBackgroundDots: true,
-        imageSize: 0.35,
-        margin: Math.round(6 * (size / 320)),
-        crossOrigin: 'anonymous',
-      },
-      dotsOptions: { color: fgColor, type: dotStyle },
-      backgroundOptions: { color: bgColor },
-      cornersSquareOptions: { color: fgColor, type: cornersSquareType },
-      cornersDotOptions: { color: fgColor, type: cornersDotType },
+  // Base UI can mount the dialog's popup in a commit AFTER the open-effect has
+  // already run (observed on the very first open of the dialog), leaving
+  // containerRef null when the effect tries to append — and nothing would
+  // retry, so the preview stayed empty. A callback ref catches the container
+  // whenever it actually mounts and appends the already-built QR; the effect
+  // below still handles the opposite order (container first, QR second).
+  const attachContainer = useCallback((node: HTMLDivElement | null) => {
+    containerRef.current = node
+    if (node && qrRef.current && node.childElementCount === 0) {
+      qrRef.current.append(node)
     }
-  }
+  }, [])
 
   // Render / update the QR whenever the dialog is open and any input changes.
   useEffect(() => {
     if (!open || !url) return
     setError(null)
     try {
-      const options = buildOptions()
+      const options = buildQrOptions(url, { fgColor, bgColor, dotStyle, cornerStyle, logo, size })
       if (!qrRef.current) {
         qrRef.current = new QRCodeStyling(options)
       } else {
@@ -170,7 +123,7 @@ export function QrDialog({ open, onOpenChange, url, label }: Props) {
   useEffect(() => {
     try {
       localStorage.setItem(
-        STORAGE_KEY,
+        QR_STYLE_STORAGE_KEY,
         JSON.stringify({ fgColor, bgColor, dotStyle, cornerStyle, logo, size } satisfies SavedStyle),
       )
     } catch {
@@ -213,7 +166,7 @@ export function QrDialog({ open, onOpenChange, url, label }: Props) {
         {error && <p className="text-xs text-destructive">{error}</p>}
 
         <div className="dot-grid-well mx-auto flex w-fit items-center justify-center rounded-md border border-border p-4 [&_canvas]:h-56 [&_canvas]:w-56">
-          <div ref={containerRef} className="flex items-center justify-center" />
+          <div ref={attachContainer} className="flex items-center justify-center" />
         </div>
 
         <div className="grid grid-cols-2 gap-4">

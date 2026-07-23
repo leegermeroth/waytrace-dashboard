@@ -19,6 +19,7 @@ import {
 import { nfcUrl, normalizeDestinationUrl, scanUrl, shortUrl, slugify } from '@/lib/links'
 import { useAuth } from '@/context/AuthContext'
 import { QrDialog } from '@/components/QrDialog'
+import { QrExportButton } from '@/components/QrExportButton'
 import { CsvImport, type CsvColumn } from '@/components/CsvImport'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -304,6 +305,14 @@ export default function CardsDetail() {
               <ArrowLeft className="size-4" />
               Back
             </Button>
+            {collection.assets.length > 0 && (
+              <QrExportButton
+                assets={collection.assets}
+                nameFor={(a) => a.person_slug}
+                zipName={`${slugify(collection.name) || 'team-cards'}-qr-codes.zip`}
+                onError={setError}
+              />
+            )}
             {canAdminister && (
               <>
                 <Button variant="outline" onClick={handleRename}>
