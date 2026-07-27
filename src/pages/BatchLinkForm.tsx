@@ -29,6 +29,7 @@ interface Row {
   key: number
   source: string
   medium: string
+  content: string
   destination: string
   label: string
   shortCode: string
@@ -43,7 +44,7 @@ interface RowResult {
 
 let rowSeq = 0
 function emptyRow(overrides: Partial<Row> = {}): Row {
-  return { key: rowSeq++, source: '', medium: '', destination: '', label: '', shortCode: '', ...overrides }
+  return { key: rowSeq++, source: '', medium: '', content: '', destination: '', label: '', shortCode: '', ...overrides }
 }
 
 // Fire a few creates at a time — enough to feel instant on a normal batch,
@@ -131,6 +132,7 @@ export default function BatchLinkForm() {
           utm_source: row.source.trim() || undefined,
           utm_medium: row.medium.trim() || undefined,
           utm_campaign: campaign.trim() || undefined,
+          utm_content: row.content.trim() || undefined,
         })
       )
       setResults(
@@ -319,13 +321,18 @@ export default function BatchLinkForm() {
             </div>
           )}
           <div className="flex flex-1 flex-col gap-2">
-            <Label htmlFor="campaign">Campaign name</Label>
-            <Input
+            <UtmCombobox
               id="campaign"
+              label="Campaign name"
+              clientId={clientId ? Number(clientId) : null}
+              field="utm_campaign"
               value={campaign}
-              onChange={(e) => setCampaign(e.target.value)}
-              placeholder="summer-2026"
+              onChange={setCampaign}
+              placeholder="Reuse a recent campaign, or type a new one"
             />
+            <p className="text-xs text-muted-foreground">
+              Recent campaigns appear as you type. Reuse one where you can — a fresh campaign per link makes reporting noisy.
+            </p>
           </div>
         </CardContent>
       </Card>
@@ -336,6 +343,7 @@ export default function BatchLinkForm() {
             utm_source: row.source,
             utm_medium: row.medium,
             utm_campaign: campaign,
+            utm_content: row.content,
           })
           return (
             <Card key={row.key}>
@@ -385,6 +393,15 @@ export default function BatchLinkForm() {
                     onChange={(v) => updateRow(row.key, { medium: v })}
                     placeholder="paid-social"
                     relatedSource={row.source}
+                  />
+                  <UtmCombobox
+                    id={`content-${row.key}`}
+                    label="UTM Content (optional)"
+                    clientId={clientId ? Number(clientId) : null}
+                    field="utm_content"
+                    value={row.content}
+                    onChange={(v) => updateRow(row.key, { content: v })}
+                    placeholder="hero-button"
                   />
                 </div>
 

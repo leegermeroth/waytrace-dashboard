@@ -141,7 +141,7 @@ export default function Settings() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <Link to="/dashboard/settings/tracking-foundation" className={buttonVariants({ variant: 'outline' })}>
+          <Link to="/dashboard/settings/tracking-foundation" className={buttonVariants()}>
             Manage tracking foundation
           </Link>
         </CardContent>
@@ -150,12 +150,15 @@ export default function Settings() {
       <Card className="max-w-xl">
         <CardHeader>
           <CardTitle>Integrations</CardTitle>
+          {/* Keep this list in sync with the Integrations page — add each new
+              integration here as it ships (currently: WordPress plugin + GA4). */}
           <CardDescription>
-            Connect Google Analytics to see sessions, key events, and revenue alongside your clicks and scans.
+            Install the WordPress plugin and connect Google Analytics to see sessions, key events, and
+            revenue alongside your clicks and scans.
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <Link to="/dashboard/settings/integrations" className={buttonVariants({ variant: 'outline' })}>
+          <Link to="/dashboard/settings/integrations" className={buttonVariants()}>
             Manage integrations
           </Link>
         </CardContent>

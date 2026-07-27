@@ -23,6 +23,7 @@ import {
   type DestinationHistoryEntry,
   type Ga4DimensionRow,
   type Ga4LinkReport,
+  type Ga4SessionRow,
   type Link,
   type LinkStats,
   type VariantWithStats,
@@ -749,6 +750,54 @@ function VariantDialog({
   )
 }
 
+/** Seconds → "1m 23s" (or "45s" under a minute). */
+function fmtDuration(seconds: number): string {
+  const s = Math.round(seconds)
+  if (s < 60) return `${s}s`
+  return `${Math.floor(s / 60)}m ${s % 60}s`
+}
+
+/** A GA4 rate (0–1) as a whole percent. */
+function fmtPct(v: number): string {
+  return `${Math.round(v * 100)}%`
+}
+
+/** Friendly labels for GA4's newVsReturning dimension values. */
+const NEW_RETURNING_LABELS: Record<string, string> = {
+  new: 'New',
+  returning: 'Returning',
+}
+
+/** A compact session-share breakdown list (device, new vs returning). */
+function SessionBreakdown({
+  title,
+  rows,
+  labelMap,
+}: {
+  title: string
+  rows: Ga4SessionRow[]
+  labelMap?: Record<string, string>
+}) {
+  const total = rows.reduce((s, r) => s + r.sessions, 0)
+  if (total === 0) return null
+  return (
+    <div className="flex flex-col gap-2">
+      <span className="eyebrow-sm">{title}</span>
+      <ul className="flex flex-col gap-1.5">
+        {rows.map((r) => (
+          <li key={r.key} className="flex items-baseline justify-between gap-4 text-sm">
+            <span className="capitalize text-foreground">{labelMap?.[r.key] ?? r.key}</span>
+            <span className="mono text-xs text-muted-foreground">
+              {r.sessions.toLocaleString()}
+              <span className="text-slate"> · {fmtPct(r.sessions / total)}</span>
+            </span>
+          </li>
+        ))}
+      </ul>
+    </div>
+  )
+}
+
 /** Post-click GA4 metrics for this link. Renders nothing on error / no UTMs. */
 function Ga4LinkPanel({ ga4 }: { ga4: Ga4LinkReport }) {
   if (ga4.reason === 'error' || ga4.reason === 'no_utms') return null
@@ -772,12 +821,15 @@ function Ga4LinkPanel({ ga4 }: { ga4: Ga4LinkReport }) {
 
   const t = ga4.totals ?? { sessions: 0, engagedSessions: 0, keyEvents: 0, revenue: 0 }
   const empty = t.sessions === 0 && t.keyEvents === 0 && t.revenue === 0
+  const eng = ga4.engagement
+  const topPages = ga4.topPages ?? []
   return (
     <Card>
       <CardHeader>
         <CardTitle>Post-click · Google Analytics</CardTitle>
         <CardDescription>
-          Matched to this link's UTMs{ga4.property_name ? ` · ${ga4.property_name}` : ''}
+          What happened after the click, for sessions matched to this link
+          {ga4.property_name ? ` · ${ga4.property_name}` : ''}
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -786,11 +838,63 @@ function Ga4LinkPanel({ ga4 }: { ga4: Ga4LinkReport }) {
             No GA4 sessions have matched this link's UTMs yet.
           </p>
         ) : (
-          <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-            <StatCard label="Sessions" value={t.sessions.toLocaleString()} />
-            <StatCard label="Engaged" value={t.engagedSessions.toLocaleString()} />
-            <StatCard label="Key events" value={t.keyEvents.toLocaleString()} />
-            <StatCard label="Revenue" value={fmtRevenue(t.revenue)} />
+          <div className="flex flex-col gap-6">
+            <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+              <StatCard label="Sessions" value={t.sessions.toLocaleString()} />
+              <StatCard label="Engaged" value={t.engagedSessions.toLocaleString()} />
+              <StatCard label="Key events" value={t.keyEvents.toLocaleString()} />
+              <StatCard label="Revenue" value={fmtRevenue(t.revenue)} />
+            </div>
+
+            {eng && (t.sessions > 0) && (
+              <div className="grid grid-cols-3 gap-4">
+                <div className="flex flex-col gap-1">
+                  <span className="eyebrow-sm">Avg. session</span>
+                  <span className="mono text-foreground">{fmtDuration(eng.avgSessionDuration)}</span>
+                </div>
+                <div className="flex flex-col gap-1">
+                  <span className="eyebrow-sm">Engagement rate</span>
+                  <span className="mono text-foreground">{fmtPct(eng.engagementRate)}</span>
+                </div>
+                <div className="flex flex-col gap-1">
+                  <span className="eyebrow-sm">Bounce rate</span>
+                  <span className="mono text-foreground">{fmtPct(eng.bounceRate)}</span>
+                </div>
+              </div>
+            )}
+
+            {topPages.length > 0 && (
+              <div className="flex flex-col gap-2">
+                <span className="eyebrow-sm">Top pages viewed</span>
+                <ul className="flex flex-col">
+                  {topPages.map((p) => (
+                    <li
+                      key={p.key}
+                      className="flex items-center justify-between gap-4 border-b border-border py-2 text-sm last:border-0"
+                    >
+                      <span className="mono truncate text-xs text-muted-foreground" title={p.key}>
+                        {p.key}
+                      </span>
+                      <span className="mono shrink-0 text-xs text-foreground">
+                        {(p.views ?? 0).toLocaleString()} views
+                        <span className="text-slate"> · {p.sessions.toLocaleString()} sess</span>
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            {(ga4.byNewReturning?.length || ga4.byDevice?.length) ? (
+              <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
+                <SessionBreakdown
+                  title="New vs returning"
+                  rows={ga4.byNewReturning ?? []}
+                  labelMap={NEW_RETURNING_LABELS}
+                />
+                <SessionBreakdown title="By device" rows={ga4.byDevice ?? []} />
+              </div>
+            ) : null}
           </div>
         )}
       </CardContent>

@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react'
+import { Link as RouterLink } from 'react-router-dom'
 import { cn } from '@/lib/utils'
 
 /**
@@ -131,14 +132,17 @@ export function StatCard({
   value,
   hint,
   reference = false,
+  to,
 }: {
   label: string
   value: ReactNode
   hint?: ReactNode
   reference?: boolean
+  /** When set, the whole tile becomes a link with a hover affordance. */
+  to?: string
 }) {
-  return (
-    <div className="rounded-xl border border-border bg-card p-5">
+  const inner = (
+    <>
       <div className="flex items-center gap-2">
         {reference && (
           <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-ochre" aria-hidden="true" />
@@ -149,8 +153,19 @@ export function StatCard({
         {value}
       </div>
       {hint && <div className="mt-2 text-xs text-muted-foreground">{hint}</div>}
-    </div>
+    </>
   )
+  if (to) {
+    return (
+      <RouterLink
+        to={to}
+        className="block rounded-xl border border-border bg-card p-5 transition-colors hover:border-ochre/60"
+      >
+        {inner}
+      </RouterLink>
+    )
+  }
+  return <div className="rounded-xl border border-border bg-card p-5">{inner}</div>
 }
 
 /**

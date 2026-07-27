@@ -16,13 +16,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
+import { FilterSelect } from '@/components/FilterSelect'
 
 type SortKey = 'label' | 'clicks' | 'scans' | 'created_at'
 type StatusFilter = 'all' | 'active' | 'inactive'
@@ -63,6 +57,7 @@ export default function LinksList() {
   const [sourceFilter, setSourceFilter] = useState<string>('all')
   const [mediumFilter, setMediumFilter] = useState<string>('all')
   const [campaignFilter, setCampaignFilter] = useState<string>('all')
+  const [contentFilter, setContentFilter] = useState<string>('all')
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all')
 
   const [sortKey, setSortKey] = useState<SortKey>('created_at')
@@ -96,6 +91,7 @@ export default function LinksList() {
       source: collect((l) => l.utm_source),
       medium: collect((l) => l.utm_medium),
       campaign: collect((l) => l.utm_campaign),
+      content: collect((l) => l.utm_content),
     }
   }, [links])
 
@@ -106,6 +102,7 @@ export default function LinksList() {
       if (sourceFilter !== 'all' && (l.utm_source || '') !== sourceFilter) return false
       if (mediumFilter !== 'all' && (l.utm_medium || '') !== mediumFilter) return false
       if (campaignFilter !== 'all' && (l.utm_campaign || '') !== campaignFilter) return false
+      if (contentFilter !== 'all' && (l.utm_content || '') !== contentFilter) return false
       if (statusFilter === 'active' && !l.is_active) return false
       if (statusFilter === 'inactive' && l.is_active) return false
       if (q) {
@@ -148,6 +145,7 @@ export default function LinksList() {
     sourceFilter,
     mediumFilter,
     campaignFilter,
+    contentFilter,
     statusFilter,
     sortKey,
     sortDir,
@@ -159,6 +157,7 @@ export default function LinksList() {
     sourceFilter !== 'all' ||
     mediumFilter !== 'all' ||
     campaignFilter !== 'all' ||
+    contentFilter !== 'all' ||
     statusFilter !== 'all'
 
   function clearFilters() {
@@ -167,6 +166,7 @@ export default function LinksList() {
     setSourceFilter('all')
     setMediumFilter('all')
     setCampaignFilter('all')
+    setContentFilter('all')
     setStatusFilter('all')
   }
 
@@ -224,64 +224,49 @@ export default function LinksList() {
 
         <div className="flex flex-wrap items-center gap-2">
           {clients.length > 1 && (
-            <Select value={clientFilter} onValueChange={(v) => setClientFilter(v ?? 'all')}>
-              <SelectTrigger className="h-8 w-auto min-w-40">
-                <SelectValue placeholder="All workspaces" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All workspaces</SelectItem>
-                {clients.map((c) => (
-                  <SelectItem key={c.id} value={String(c.id)}>
-                    {c.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <FilterSelect
+              label="Workspace"
+              allLabel="All workspaces"
+              value={clientFilter}
+              onChange={setClientFilter}
+              options={clients.map((c) => ({ value: String(c.id), label: c.name }))}
+            />
           )}
           {distinct.source.length > 0 && (
-            <Select value={sourceFilter} onValueChange={(v) => setSourceFilter(v ?? 'all')}>
-              <SelectTrigger className="h-8 w-auto min-w-32">
-                <SelectValue placeholder="Source" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All sources</SelectItem>
-                {distinct.source.map((s) => (
-                  <SelectItem key={s} value={s}>
-                    {s}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <FilterSelect
+              label="Source"
+              allLabel="All sources"
+              value={sourceFilter}
+              onChange={setSourceFilter}
+              options={distinct.source.map((s) => ({ value: s, label: s }))}
+            />
           )}
           {distinct.medium.length > 0 && (
-            <Select value={mediumFilter} onValueChange={(v) => setMediumFilter(v ?? 'all')}>
-              <SelectTrigger className="h-8 w-auto min-w-32">
-                <SelectValue placeholder="Medium" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All mediums</SelectItem>
-                {distinct.medium.map((m) => (
-                  <SelectItem key={m} value={m}>
-                    {m}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <FilterSelect
+              label="Medium"
+              allLabel="All mediums"
+              value={mediumFilter}
+              onChange={setMediumFilter}
+              options={distinct.medium.map((m) => ({ value: m, label: m }))}
+            />
           )}
           {distinct.campaign.length > 0 && (
-            <Select value={campaignFilter} onValueChange={(v) => setCampaignFilter(v ?? 'all')}>
-              <SelectTrigger className="h-8 w-auto min-w-32">
-                <SelectValue placeholder="Campaign" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All campaigns</SelectItem>
-                {distinct.campaign.map((cg) => (
-                  <SelectItem key={cg} value={cg}>
-                    {cg}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <FilterSelect
+              label="Campaign"
+              allLabel="All campaigns"
+              value={campaignFilter}
+              onChange={setCampaignFilter}
+              options={distinct.campaign.map((cg) => ({ value: cg, label: cg }))}
+            />
+          )}
+          {distinct.content.length > 0 && (
+            <FilterSelect
+              label="Content"
+              allLabel="All content"
+              value={contentFilter}
+              onChange={setContentFilter}
+              options={distinct.content.map((ct) => ({ value: ct, label: ct }))}
+            />
           )}
         </div>
 
@@ -384,8 +369,24 @@ export default function LinksList() {
                   <TableCell>
                     <ValueCell value={link.utm_campaign} onClick={(v) => setCampaignFilter(v)} />
                   </TableCell>
-                  <TableCell className="mono">{link.clicks}</TableCell>
-                  <TableCell className="mono">{link.scans}</TableCell>
+                  <TableCell className="mono">
+                    <RouterLink
+                      to={`/dashboard/links/${link.id}`}
+                      title="View link stats"
+                      className="cursor-pointer text-foreground hover:text-ochre"
+                    >
+                      {link.clicks}
+                    </RouterLink>
+                  </TableCell>
+                  <TableCell className="mono">
+                    <RouterLink
+                      to={`/dashboard/links/${link.id}`}
+                      title="View link stats"
+                      className="cursor-pointer text-foreground hover:text-ochre"
+                    >
+                      {link.scans}
+                    </RouterLink>
+                  </TableCell>
                   <TableCell>
                     <StatusDot tone={link.is_active ? 'success' : 'neutral'}>
                       {link.is_active ? 'Active' : 'Inactive'}

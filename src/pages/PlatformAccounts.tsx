@@ -62,6 +62,8 @@ export default function PlatformAccounts() {
               <TableHead className="text-right">Links</TableHead>
               <TableHead className="text-right">Clicks</TableHead>
               <TableHead className="text-right">Scans</TableHead>
+              <TableHead>Onboarded</TableHead>
+              <TableHead>Custom domain</TableHead>
               <TableHead>Created</TableHead>
               <TableHead>Last activity</TableHead>
               <TableHead className="text-right">Stripe</TableHead>
@@ -96,6 +98,22 @@ export default function PlatformAccounts() {
                 <TableCell className="mono text-right text-xs">{a.link_count}</TableCell>
                 <TableCell className="mono text-right text-xs">{a.total_clicks}</TableCell>
                 <TableCell className="mono text-right text-xs">{a.total_scans}</TableCell>
+                <TableCell>
+                  {a.onboarded_at ? (
+                    <StatusDot tone="success">{formatDate(a.onboarded_at)}</StatusDot>
+                  ) : (
+                    <StatusDot tone="neutral">Not yet</StatusDot>
+                  )}
+                </TableCell>
+                <TableCell>
+                  {a.domain_count > 0 ? (
+                    <StatusDot tone="success">
+                      {a.domain_count} domain{a.domain_count === 1 ? '' : 's'}
+                    </StatusDot>
+                  ) : (
+                    <StatusDot tone="neutral">None</StatusDot>
+                  )}
+                </TableCell>
                 <TableCell className="text-xs text-muted-foreground">{formatDate(a.created_at)}</TableCell>
                 <TableCell className="text-xs text-muted-foreground">{formatDate(a.last_activity)}</TableCell>
                 <TableCell className="text-right">
@@ -117,7 +135,7 @@ export default function PlatformAccounts() {
 
             {!isLoading && accounts.length === 0 && !error && (
               <TableRow>
-                <TableCell colSpan={10} className="font-serif text-sm text-muted-foreground italic">
+                <TableCell colSpan={12} className="font-serif text-sm text-muted-foreground italic">
                   No accounts yet.
                 </TableCell>
               </TableRow>

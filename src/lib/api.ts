@@ -479,6 +479,7 @@ export interface Analytics {
   bySource: AnalyticsDimensionRow[]
   byMedium: AnalyticsDimensionRow[]
   byCampaign: AnalyticsDimensionRow[]
+  byContent: AnalyticsDimensionRow[]
   byWorkspace: AnalyticsDimensionRow[]
   topLinks: AnalyticsTopLink[]
 }
@@ -488,6 +489,7 @@ export interface AnalyticsFilters {
   source?: string
   medium?: string
   campaign?: string
+  content?: string
   from?: string
   to?: string
 }
@@ -498,6 +500,7 @@ export function getAnalytics(filters: AnalyticsFilters = {}) {
   if (filters.source) params.set('source', filters.source)
   if (filters.medium) params.set('medium', filters.medium)
   if (filters.campaign) params.set('campaign', filters.campaign)
+  if (filters.content) params.set('content', filters.content)
   if (filters.from) params.set('from', filters.from)
   if (filters.to) params.set('to', filters.to)
   const query = params.toString()
@@ -599,10 +602,18 @@ export function getGa4Analytics(filters: AnalyticsFilters = {}) {
   if (filters.source) params.set('source', filters.source)
   if (filters.medium) params.set('medium', filters.medium)
   if (filters.campaign) params.set('campaign', filters.campaign)
+  if (filters.content) params.set('content', filters.content)
   if (filters.from) params.set('from', filters.from)
   if (filters.to) params.set('to', filters.to)
   const query = params.toString()
   return request<Ga4Aggregate>(`/api/v1/analytics/ga4${query ? `?${query}` : ''}`)
+}
+
+/** A GA4 dimension row broken down by sessions (top pages, device, audience). */
+export interface Ga4SessionRow {
+  key: string
+  sessions: number
+  views?: number // present for page rows (screenPageViews)
 }
 
 export interface Ga4LinkReport {
@@ -611,6 +622,11 @@ export interface Ga4LinkReport {
   property_name?: string
   totals?: { sessions: number; engagedSessions: number; keyEvents: number; revenue: number }
   timeseries?: { day: string; sessions: number; keyEvents: number }[]
+  // Default-mode link-detail breakdowns (best-effort, absent on by='variant').
+  engagement?: { avgSessionDuration: number; engagementRate: number; bounceRate: number }
+  topPages?: Ga4SessionRow[]
+  byNewReturning?: Ga4SessionRow[]
+  byDevice?: Ga4SessionRow[]
   // Present only on by='variant' requests: the same utm_id join disaggregated
   // by utm_content (GA4 sessionManualAdContent) — keys are variant stamps.
   byContent?: Ga4DimensionRow[]
@@ -912,6 +928,11 @@ export interface AdminAccount {
   is_platform_admin: number
   is_active: number
   created_at: string
+  // Lifecycle signals for the welcome series: onboarded_at is set when the owner
+  // finishes/skips the Tracking Foundation wizard; domain_count is their custom
+  // branded domains. Both null/0 = not there yet.
+  onboarded_at: string | null
+  domain_count: number
   client_count: number
   link_count: number
   total_clicks: number

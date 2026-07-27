@@ -23,6 +23,7 @@ import {
   type Link,
 } from '@/lib/api'
 import { PageHeader, StatCard } from '@/components/brand'
+import { FilterSelect } from '@/components/FilterSelect'
 import { buttonVariants } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Alert, AlertDescription } from '@/components/ui/alert'
@@ -139,6 +140,7 @@ export default function Analytics() {
   const [source, setSource] = useState('all')
   const [medium, setMedium] = useState('all')
   const [campaign, setCampaign] = useState('all')
+  const [content, setContent] = useState('all')
   const [range, setRange] = useState('30')
 
   // Load workspaces + links once for the filter option lists.
@@ -167,6 +169,7 @@ export default function Analytics() {
       source: collect((l) => l.utm_source),
       medium: collect((l) => l.utm_medium),
       campaign: collect((l) => l.utm_campaign),
+      content: collect((l) => l.utm_content),
     }
   }, [links])
 
@@ -179,6 +182,7 @@ export default function Analytics() {
       source: source !== 'all' ? source : undefined,
       medium: medium !== 'all' ? medium : undefined,
       campaign: campaign !== 'all' ? campaign : undefined,
+      content: content !== 'all' ? content : undefined,
       from: rangeFrom(range),
     }
     getAnalytics(filters)
@@ -190,7 +194,7 @@ export default function Analytics() {
     getGa4Analytics(filters)
       .then(setGa4)
       .catch(() => setGa4(null))
-  }, [workspace, source, medium, campaign, range])
+  }, [workspace, source, medium, campaign, content, range])
 
   const totals = data?.totals ?? { total: 0, clicks: 0, scans: 0 }
   const rangeLabel = RANGES.find((r) => r.value === range)?.label ?? ''
@@ -208,66 +212,52 @@ export default function Analytics() {
 
       {/* Filters */}
       <div className="flex flex-wrap items-center gap-2">
-        <Select value={workspace} onValueChange={(v) => setWorkspace(v ?? 'all')}>
-          <SelectTrigger className="h-8 w-auto min-w-40">
-            <SelectValue placeholder="All workspaces" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All workspaces</SelectItem>
-            {clients.map((c) => (
-              <SelectItem key={c.id} value={String(c.id)}>
-                {c.name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        <FilterSelect
+          label="Workspace"
+          allLabel="All workspaces"
+          value={workspace}
+          onChange={setWorkspace}
+          options={clients.map((c) => ({ value: String(c.id), label: c.name }))}
+        />
 
         {distinct.source.length > 0 && (
-          <Select value={source} onValueChange={(v) => setSource(v ?? 'all')}>
-            <SelectTrigger className="h-8 w-auto min-w-32">
-              <SelectValue placeholder="Source" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All sources</SelectItem>
-              {distinct.source.map((s) => (
-                <SelectItem key={s} value={s}>
-                  {s}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <FilterSelect
+            label="Source"
+            allLabel="All sources"
+            value={source}
+            onChange={setSource}
+            options={distinct.source.map((s) => ({ value: s, label: s }))}
+          />
         )}
 
         {distinct.medium.length > 0 && (
-          <Select value={medium} onValueChange={(v) => setMedium(v ?? 'all')}>
-            <SelectTrigger className="h-8 w-auto min-w-32">
-              <SelectValue placeholder="Medium" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All mediums</SelectItem>
-              {distinct.medium.map((m) => (
-                <SelectItem key={m} value={m}>
-                  {m}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <FilterSelect
+            label="Medium"
+            allLabel="All mediums"
+            value={medium}
+            onChange={setMedium}
+            options={distinct.medium.map((m) => ({ value: m, label: m }))}
+          />
         )}
 
         {distinct.campaign.length > 0 && (
-          <Select value={campaign} onValueChange={(v) => setCampaign(v ?? 'all')}>
-            <SelectTrigger className="h-8 w-auto min-w-36">
-              <SelectValue placeholder="Campaign" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All campaigns</SelectItem>
-              {distinct.campaign.map((c) => (
-                <SelectItem key={c} value={c}>
-                  {c}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <FilterSelect
+            label="Campaign"
+            allLabel="All campaigns"
+            value={campaign}
+            onChange={setCampaign}
+            options={distinct.campaign.map((c) => ({ value: c, label: c }))}
+          />
+        )}
+
+        {distinct.content.length > 0 && (
+          <FilterSelect
+            label="Content"
+            allLabel="All content"
+            value={content}
+            onChange={setContent}
+            options={distinct.content.map((c) => ({ value: c, label: c }))}
+          />
         )}
 
         <Select value={range} onValueChange={(v) => setRange(v ?? '30')}>
@@ -393,6 +383,7 @@ export default function Analytics() {
         <BreakdownCard title="By source" description="Where traffic originates" rows={data?.bySource ?? []} ga4={ga4?.connected ? ga4Source : undefined} />
         <BreakdownCard title="By medium" description="Channel type" rows={data?.byMedium ?? []} ga4={ga4?.connected ? ga4Medium : undefined} />
         <BreakdownCard title="By campaign" description="Grouped by utm_campaign" rows={data?.byCampaign ?? []} ga4={ga4?.connected ? ga4Campaign : undefined} />
+        <BreakdownCard title="By content" description="Grouped by utm_content" rows={data?.byContent ?? []} />
         <BreakdownCard title="By workspace" description="Grouped by workspace" rows={data?.byWorkspace ?? []} />
       </div>
 

@@ -50,9 +50,9 @@ export default function Dashboard() {
       )}
 
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-        <StatCard label="Total links" value={isLoading ? '—' : totalLinks} reference />
-        <StatCard label="Link clicks" value={isLoading ? '—' : totalClicks} />
-        <StatCard label="QR scans" value={isLoading ? '—' : totalScans} />
+        <StatCard label="Total links" value={isLoading ? '—' : totalLinks} reference to="/dashboard/links" />
+        <StatCard label="Link clicks" value={isLoading ? '—' : totalClicks} to="/dashboard/analytics" />
+        <StatCard label="QR scans" value={isLoading ? '—' : totalScans} to="/dashboard/analytics" />
         <StatCard
           label="Plan"
           value={planLabel}
@@ -90,7 +90,12 @@ export default function Dashboard() {
                   >
                     {link.label || link.short_code}
                   </RouterLink>
-                  <span className="mono text-muted-foreground">{link.clicks} clicks</span>
+                  <RouterLink
+                    to={`/dashboard/links/${link.id}`}
+                    className="mono text-muted-foreground hover:text-ochre"
+                  >
+                    {link.clicks} clicks
+                  </RouterLink>
                 </li>
               ))}
             </ul>
