@@ -298,11 +298,13 @@ export default function BatchLinkForm() {
         </Alert>
       )}
 
-      <Card>
+      {/* overflow-visible so the campaign autocomplete dropdown isn't clipped by
+          the card (Card is overflow-hidden for its rounded corners). */}
+      <Card className="overflow-visible">
         <CardHeader>
           <CardTitle>Campaign</CardTitle>
         </CardHeader>
-        <CardContent className="flex flex-col gap-4 sm:flex-row sm:items-end">
+        <CardContent className="flex flex-col gap-4 sm:flex-row sm:items-start">
           {clients.length > 1 && (
             <div className="flex flex-col gap-2 sm:w-56">
               <Label>Workspace</Label>
@@ -346,7 +348,7 @@ export default function BatchLinkForm() {
             utm_content: row.content,
           })
           return (
-            <Card key={row.key}>
+            <Card key={row.key} className="overflow-visible">
               <CardContent className="flex flex-col gap-4 pt-6">
                 <div className="flex items-center justify-between">
                   <span className="eyebrow-sm">Link {i + 1}</span>

@@ -151,8 +151,10 @@ export default function DashboardLayout() {
         </nav>
       </header>
 
-      {/* Main content */}
-      <div className="flex-1 md:pl-60">
+      {/* Main content. min-w-0 so a wide child (e.g. the Accounts table) scrolls
+          inside its own overflow-x-auto container instead of forcing a second,
+          page-level horizontal scrollbar (flex items default to min-width:auto). */}
+      <div className="min-w-0 flex-1 md:pl-60">
         <main className="dot-grid min-h-svh">
           <div className="mx-auto max-w-6xl px-6 py-8 md:px-10 md:py-10">
             <Outlet />
