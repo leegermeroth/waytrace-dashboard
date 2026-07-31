@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react'
+import { useCallback, useEffect, useMemo, useState, type FormEvent, type ReactNode } from 'react'
 import { Link as RouterLink, useParams } from 'react-router-dom'
 import { ArrowLeft, Check, Copy, QrCode as QrIcon, Upload } from 'lucide-react'
 import {
@@ -68,6 +68,19 @@ const CSV_TEMPLATE_EXAMPLES = [
 
 function fmtRevenue(v: number): string {
   return v.toLocaleString(undefined, { style: 'currency', currency: 'USD', maximumFractionDigits: 0 })
+}
+
+/** A right-aligned stat number that links through to the link's stats page. */
+function StatLink({ linkId, children }: { linkId: number; children: ReactNode }) {
+  return (
+    <RouterLink
+      to={`/dashboard/links/${linkId}`}
+      title="View link stats"
+      className="cursor-pointer text-foreground hover:text-ochre"
+    >
+      {children}
+    </RouterLink>
+  )
 }
 
 /** Per-link GA4 metrics for the grid columns, keyed by link_id. */
@@ -358,7 +371,15 @@ export default function PackagingDetail() {
                 const ga4Row = ga4?.byLink.get(asset.link_id)
                 return (
                 <TableRow key={asset.id}>
-                  <TableCell className="mono text-xs font-medium">{asset.sku}</TableCell>
+                  <TableCell className="mono text-xs font-medium">
+                    <RouterLink
+                      to={`/dashboard/links/${asset.link_id}`}
+                      title="View link stats"
+                      className="hover:text-ochre"
+                    >
+                      {asset.sku}
+                    </RouterLink>
+                  </TableCell>
                   <TableCell>{asset.product_name}</TableCell>
                   <TableCell className="text-xs text-muted-foreground">{asset.variant}</TableCell>
                   <TableCell>
@@ -375,21 +396,25 @@ export default function PackagingDetail() {
                       )}
                     </button>
                   </TableCell>
-                  <TableCell className="mono text-right text-xs">{asset.scans}</TableCell>
-                  <TableCell className="mono text-right text-xs">{asset.clicks}</TableCell>
+                  <TableCell className="mono text-right text-xs">
+                    <StatLink linkId={asset.link_id}>{asset.scans}</StatLink>
+                  </TableCell>
+                  <TableCell className="mono text-right text-xs">
+                    <StatLink linkId={asset.link_id}>{asset.clicks}</StatLink>
+                  </TableCell>
                   {showGa4 && (
                     <TableCell className="mono text-right text-xs">
-                      {(ga4Row?.sessions ?? 0).toLocaleString()}
+                      <StatLink linkId={asset.link_id}>{(ga4Row?.sessions ?? 0).toLocaleString()}</StatLink>
                     </TableCell>
                   )}
                   {showGa4 && (
                     <TableCell className="mono text-right text-xs">
-                      {(ga4Row?.keyEvents ?? 0).toLocaleString()}
+                      <StatLink linkId={asset.link_id}>{(ga4Row?.keyEvents ?? 0).toLocaleString()}</StatLink>
                     </TableCell>
                   )}
                   {showGa4 && (
                     <TableCell className="mono text-right text-xs">
-                      {fmtRevenue(ga4Row?.revenue ?? 0)}
+                      <StatLink linkId={asset.link_id}>{fmtRevenue(ga4Row?.revenue ?? 0)}</StatLink>
                     </TableCell>
                   )}
                   <TableCell>

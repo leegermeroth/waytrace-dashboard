@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react'
+import { useCallback, useEffect, useMemo, useState, type FormEvent, type ReactNode } from 'react'
 import { Link as RouterLink, useParams } from 'react-router-dom'
 import { ArrowLeft, Check, Copy, Nfc, QrCode as QrIcon, Upload } from 'lucide-react'
 import {
@@ -85,6 +85,19 @@ const CSV_TEMPLATE_EXAMPLES = [
   ['Katie Painter', 'katie-painter', 'Co-Founder', 'katie@example.com', '+1 555 000 1234', ''],
   ['Hayley Painter', 'hayley-painter', 'Co-Founder', 'hayley@example.com', '', 'https://example.com/meet-hayley'],
 ]
+
+/** A right-aligned stat number that links through to the card link's stats page. */
+function StatLink({ linkId, children }: { linkId: number; children: ReactNode }) {
+  return (
+    <RouterLink
+      to={`/dashboard/links/${linkId}`}
+      title="View link stats"
+      className="cursor-pointer text-foreground hover:text-ochre"
+    >
+      {children}
+    </RouterLink>
+  )
+}
 
 /** Fill a blank slug from the name (applied on CSV parse and again on submit). */
 function autoSlug(values: Record<string, string>): Record<string, string> {
@@ -367,7 +380,15 @@ export default function CardsDetail() {
                 const taps = asset.taps ?? 0
                 return (
                   <TableRow key={asset.id}>
-                    <TableCell className="font-medium">{asset.person_name}</TableCell>
+                    <TableCell className="font-medium">
+                      <RouterLink
+                        to={`/dashboard/links/${asset.link_id}`}
+                        title="View link stats"
+                        className="hover:text-ochre"
+                      >
+                        {asset.person_name}
+                      </RouterLink>
+                    </TableCell>
                     <TableCell className="text-xs text-muted-foreground">{asset.title}</TableCell>
                     <TableCell>
                       <button
@@ -406,9 +427,15 @@ export default function CardsDetail() {
                         </span>
                       )}
                     </TableCell>
-                    <TableCell className="mono text-right text-xs">{taps}</TableCell>
-                    <TableCell className="mono text-right text-xs">{Math.max(0, asset.scans - taps)}</TableCell>
-                    <TableCell className="mono text-right text-xs">{asset.clicks}</TableCell>
+                    <TableCell className="mono text-right text-xs">
+                      <StatLink linkId={asset.link_id}>{taps}</StatLink>
+                    </TableCell>
+                    <TableCell className="mono text-right text-xs">
+                      <StatLink linkId={asset.link_id}>{Math.max(0, asset.scans - taps)}</StatLink>
+                    </TableCell>
+                    <TableCell className="mono text-right text-xs">
+                      <StatLink linkId={asset.link_id}>{asset.clicks}</StatLink>
+                    </TableCell>
                     <TableCell>
                       <StatusDot tone={asset.is_active ? 'success' : 'neutral'}>
                         {asset.is_active ? 'Live' : 'Off'}
