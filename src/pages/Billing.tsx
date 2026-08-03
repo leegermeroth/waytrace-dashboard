@@ -38,20 +38,20 @@ function withinRefundWindow(subscriptionStartedAt: string | null | undefined): b
   return Date.now() - startedAt <= REFUND_WINDOW_DAYS * 24 * 60 * 60 * 1000
 }
 
-// Live-mode Stripe Price IDs — must stay in sync with PRICE_TIER_MAP in
-// link-manager-worker/src/routes/stripe.ts.
+// Labels and display prices only. The Worker owns the Stripe Price catalog and
+// resolves this plan/interval selection server-side.
 const PLANS = [
   {
-    tier: 'pro',
+    tier: 'pro' as const,
     label: 'Professional',
-    monthly: { priceId: 'price_1Toqc1Pff1p1MFpE2dEogzWq', price: '$12/mo' },
-    annual: { priceId: 'price_1Toqc0Pff1p1MFpEtDcKoP3F', price: '$95/yr' },
+    monthly: { price: '$12/mo' },
+    annual: { price: '$95/yr' },
   },
   {
-    tier: 'agency',
+    tier: 'agency' as const,
     label: 'Team',
-    monthly: { priceId: 'price_1ToqbwPff1p1MFpEmLTk2Zxm', price: '$45/mo' },
-    annual: { priceId: 'price_1ToqbvPff1p1MFpERTomCFrQ', price: '$395/yr' },
+    monthly: { price: '$45/mo' },
+    annual: { price: '$395/yr' },
   },
 ]
 
@@ -68,16 +68,6 @@ function statusVariant(status: string | undefined): 'success' | 'secondary' | 'd
   if (status === 'active' || status === 'trialing') return 'success'
   if (status === 'cancelled' || status === 'unpaid') return 'destructive'
   return 'secondary'
-}
-
-/** Which billing interval a Stripe price ID corresponds to, or null if unknown. */
-function intervalForPrice(priceId: string | null | undefined): 'monthly' | 'annual' | null {
-  if (!priceId) return null
-  for (const plan of PLANS) {
-    if (plan.monthly.priceId === priceId) return 'monthly'
-    if (plan.annual.priceId === priceId) return 'annual'
-  }
-  return null
 }
 
 export default function Billing() {
@@ -135,11 +125,12 @@ export default function Billing() {
     }
   }
 
-  async function handleUpgrade(priceId: string) {
+  async function handleUpgrade(plan: 'pro' | 'agency', selectedInterval: 'monthly' | 'annual') {
+    const actionKey = `${plan}:${selectedInterval}`
     setError(null)
-    setPendingAction(priceId)
+    setPendingAction(actionKey)
     try {
-      const { url } = await createCheckoutSession(priceId)
+      const { url } = await createCheckoutSession(plan, selectedInterval)
       window.location.href = url
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to start checkout')
@@ -203,9 +194,9 @@ export default function Billing() {
           <Badge variant={statusVariant(me?.subscription_status)} className="capitalize">
             {me?.subscription_status ?? '—'}
           </Badge>
-          {intervalForPrice(me?.stripe_price_id) && (
+          {me?.billing_interval && (
             <Badge variant="secondary">
-              {intervalForPrice(me?.stripe_price_id) === 'annual' ? 'Annual' : 'Monthly'}
+              {me.billing_interval === 'annual' ? 'Annual' : 'Monthly'}
             </Badge>
           )}
         </CardContent>
@@ -234,7 +225,8 @@ export default function Billing() {
       <div className="grid max-w-xl gap-4 sm:grid-cols-2">
         {PLANS.map((plan) => {
           const selected = plan[interval]
-          const isCurrentPrice = me?.stripe_price_id === selected.priceId
+          const actionKey = `${plan.tier}:${interval}`
+          const isCurrentPrice = me?.billing_plan === plan.tier && me?.billing_interval === interval
           const isCurrentTierOtherInterval = me?.tier === plan.tier && !isCurrentPrice
           const currentRank = TIER_RANK[me?.tier ?? 'free'] ?? 0
           const changeVerb = (TIER_RANK[plan.tier] ?? 0) < currentRank ? 'Downgrade' : 'Upgrade'
@@ -249,12 +241,12 @@ export default function Billing() {
               <CardFooter>
                 <Button
                   className="w-full"
-                  disabled={isCurrentPrice || pendingAction === selected.priceId}
-                  onClick={() => handleUpgrade(selected.priceId)}
+                  disabled={isCurrentPrice || pendingAction === actionKey}
+                  onClick={() => handleUpgrade(plan.tier, interval)}
                 >
                   {isCurrentPrice
                     ? 'Current plan'
-                    : pendingAction === selected.priceId
+                    : pendingAction === actionKey
                       ? 'Redirecting...'
                       : isCurrentTierOtherInterval
                         ? `Switch to ${interval === 'annual' ? 'annual' : 'monthly'} billing`

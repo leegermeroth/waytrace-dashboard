@@ -281,6 +281,8 @@ export interface Me {
   stripe_customer_id: string | null
   stripe_subscription_id: string | null
   stripe_price_id: string | null
+  billing_plan: 'pro' | 'agency' | null
+  billing_interval: 'monthly' | 'annual' | null
   subscription_started_at: string | null
   // ISO timestamp stamped once the account owner completes/skips the onboarding
   // wizard. NULL until then — how the first-login wizard gate is decided.
@@ -352,10 +354,10 @@ export function enterpriseInquiry(input: { name: string; email: string; company?
   })
 }
 
-export function createCheckoutSession(price_id: string) {
+export function createCheckoutSession(plan: 'pro' | 'agency', interval: 'monthly' | 'annual') {
   return request<{ url: string }>('/api/v1/billing/checkout', {
     method: 'POST',
-    body: JSON.stringify({ price_id }),
+    body: JSON.stringify({ plan, interval }),
   })
 }
 
