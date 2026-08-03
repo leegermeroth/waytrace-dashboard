@@ -20,6 +20,7 @@ export type Role = 'owner' | 'admin' | 'contributor'
 
 interface AuthState {
   apiToken: string | null
+  sessionExpiresAt: string | null
   tier: string | null
   subscriptionStatus: string | null
   role: Role | null
@@ -55,6 +56,7 @@ interface AuthContextValue extends AuthState {
   completeSetup: (token: string, password: string) => Promise<void>
   completeReset: (token: string, password: string) => Promise<void>
   acceptInvite: (token: string, password: string, name?: string) => Promise<void>
+  replaceSession: (apiToken: string, expiresAt: string) => void
   logout: () => void
 }
 
@@ -64,6 +66,7 @@ const AuthContext = createContext<AuthContextValue | null>(null)
 
 const EMPTY_AUTH: AuthState = {
   apiToken: null,
+  sessionExpiresAt: null,
   tier: null,
   subscriptionStatus: null,
   role: null,
@@ -77,6 +80,7 @@ function loadStoredAuth(): AuthState {
     const parsed = JSON.parse(raw)
     return {
       apiToken: parsed.apiToken ?? null,
+      sessionExpiresAt: parsed.sessionExpiresAt ?? null,
       tier: parsed.tier ?? null,
       subscriptionStatus: parsed.subscriptionStatus ?? null,
       role: parsed.role ?? null,
@@ -102,6 +106,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const result = await loginAccount(email, password)
     persist({
       apiToken: result.api_token,
+      sessionExpiresAt: result.expires_at ?? null,
       tier: result.tier,
       subscriptionStatus: result.subscription_status,
       // The Worker only returns `role` for invited Team users; an account owner
@@ -116,6 +121,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const result = await registerAccount(email, password, name)
     persist({
       apiToken: result.api_token,
+      sessionExpiresAt: result.expires_at ?? null,
       tier: result.tier,
       subscriptionStatus: result.subscription_status,
       role: 'owner',
@@ -127,6 +133,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const result = await setPassword(token, password)
     persist({
       apiToken: result.api_token,
+      sessionExpiresAt: result.expires_at ?? null,
       tier: result.tier,
       subscriptionStatus: result.subscription_status,
       role: 'owner',
@@ -138,6 +145,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const result = await resetPassword(token, password)
     persist({
       apiToken: result.api_token,
+      sessionExpiresAt: result.expires_at ?? null,
       tier: result.tier,
       subscriptionStatus: result.subscription_status,
       role: 'owner',
@@ -149,6 +157,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const result = await acceptInviteApi(token, password, name)
     persist({
       apiToken: result.api_token,
+      sessionExpiresAt: result.expires_at ?? null,
       tier: result.tier,
       subscriptionStatus: result.subscription_status,
       role: result.role ?? 'contributor',
@@ -160,6 +169,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     localStorage.removeItem(STORAGE_KEY)
     setAuth(EMPTY_AUTH)
     setOnboardedAt(undefined)
+  }, [])
+
+  const replaceSession = useCallback((apiToken: string, expiresAt: string) => {
+    setAuth((prev) => {
+      const next = { ...prev, apiToken, sessionExpiresAt: expiresAt }
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(next))
+      return next
+    })
   }, [])
 
   const markOnboarded = useCallback(async () => {
@@ -227,6 +244,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         completeSetup,
         completeReset,
         acceptInvite,
+        replaceSession,
         logout,
       }}
     >

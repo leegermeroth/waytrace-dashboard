@@ -8,6 +8,7 @@ import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { PageHeader } from '@/components/brand'
+import { useAuth } from '@/context/AuthContext'
 
 // Internal tier values → the customer-facing plan names used everywhere in the
 // UI (matches Billing.tsx). 'agency' is branded "Team".
@@ -19,15 +20,15 @@ const TIER_LABELS: Record<string, string> = {
 }
 
 export default function Settings() {
+  const { replaceSession } = useAuth()
   const [me, setMe] = useState<Me | null>(null)
   const [error, setError] = useState<string | null>(null)
 
   const [currentPassword, setCurrentPassword] = useState('')
   const [newPassword, setNewPassword] = useState('')
   const [passwordError, setPasswordError] = useState<string | null>(null)
-  const [passwordSuccess, setPasswordSuccess] = useState(false)
+  const [passwordSuccess, setPasswordSuccess] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
-  const [copied, setCopied] = useState(false)
 
   const [newEmail, setNewEmail] = useState('')
   const [emailError, setEmailError] = useState<string | null>(null)
@@ -62,11 +63,14 @@ export default function Settings() {
   async function handleChangePassword(e: FormEvent) {
     e.preventDefault()
     setPasswordError(null)
-    setPasswordSuccess(false)
+    setPasswordSuccess(null)
     setIsSubmitting(true)
     try {
-      await changePassword(currentPassword, newPassword)
-      setPasswordSuccess(true)
+      const result = await changePassword(currentPassword, newPassword)
+      replaceSession(result.api_token, result.expires_at)
+      setPasswordSuccess(
+        `Password updated. ${result.revoked_browser_sessions} prior dashboard session${result.revoked_browser_sessions === 1 ? '' : 's'} signed out; connected WordPress sites remain active.`
+      )
       setCurrentPassword('')
       setNewPassword('')
     } catch (err) {
@@ -74,13 +78,6 @@ export default function Settings() {
     } finally {
       setIsSubmitting(false)
     }
-  }
-
-  async function handleCopyToken() {
-    if (!me?.api_token) return
-    await navigator.clipboard.writeText(me.api_token)
-    setCopied(true)
-    setTimeout(() => setCopied(false), 1500)
   }
 
   // Invited Team users (admin or contributor) authenticate with their own
@@ -215,7 +212,7 @@ export default function Settings() {
             )}
             {passwordSuccess && (
               <Alert>
-                <AlertDescription>Password updated.</AlertDescription>
+                <AlertDescription>{passwordSuccess}</AlertDescription>
               </Alert>
             )}
             <div className="flex flex-col gap-2">
@@ -246,22 +243,6 @@ export default function Settings() {
         </CardContent>
       </Card>
 
-      <Card className="max-w-xl">
-        <CardHeader>
-          <CardTitle>API token</CardTitle>
-          <CardDescription>
-            Used by the WordPress plugin and direct API access. Keep this secret.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="flex items-center gap-2">
-            <Input readOnly value={me?.api_token ?? ''} className="font-mono text-xs" />
-            <Button type="button" variant="outline" onClick={handleCopyToken}>
-              {copied ? 'Copied!' : 'Copy'}
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
       </>
       )}
     </div>

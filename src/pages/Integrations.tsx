@@ -8,12 +8,15 @@ import {
   disconnectGa4,
   setWorkspaceGa4Property,
   getPluginInfo,
+  listWordPressSiteCredentials,
+  revokeWordPressSiteCredential,
   listClients,
   type Me,
   type Ga4Connection,
   type Ga4Property,
   type PluginInfo,
   type Client,
+  type WordPressSiteCredential,
 } from '@/lib/api'
 import { Button, buttonVariants } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -44,6 +47,9 @@ export default function Integrations() {
   const [propertyErrors, setPropertyErrors] = useState<{ google_email: string; error: string }[]>([])
   const [clients, setClients] = useState<Client[]>([])
   const [plugin, setPlugin] = useState<PluginInfo | null>(null)
+  const [siteCredentials, setSiteCredentials] = useState<WordPressSiteCredential[]>([])
+  const [revokingCredentialId, setRevokingCredentialId] = useState<number | null>(null)
+  const [downloadingPlugin, setDownloadingPlugin] = useState(false)
   const [loadError, setLoadError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
 
@@ -81,19 +87,21 @@ export default function Integrations() {
         setLoading(false)
         return
       }
-      const [conns, props, cls, pluginInfo] = await Promise.all([
+      const isOwner = meData.user_id == null
+      const [conns, props, cls, pluginInfo, sites] = await Promise.all([
         getGa4Connections(),
         getGa4Properties(),
         listClients(),
-        // Plugin download is owner-only (its token auth accepts account tokens,
-        // not invited-user tokens); returns null for ineligible accounts.
-        meData.api_token ? getPluginInfo().catch(() => null) : Promise.resolve(null),
+        // Plugin download and site-credential management are owner-only.
+        isOwner ? getPluginInfo().catch(() => null) : Promise.resolve(null),
+        isOwner ? listWordPressSiteCredentials().catch(() => []) : Promise.resolve([]),
       ])
       setConnections(conns)
       setProperties(props.properties)
       setPropertyErrors(props.errors)
       setClients(cls)
       setPlugin(pluginInfo)
+      setSiteCredentials(sites)
     } catch (err) {
       setLoadError(err instanceof Error ? err.message : 'Failed to load integrations')
     } finally {
@@ -126,6 +134,36 @@ export default function Integrations() {
       setBanner({ kind: 'error', message: err instanceof Error ? err.message : 'Failed to disconnect' })
     } finally {
       setDisconnectingId(null)
+    }
+  }
+
+  async function handleRevokeSite(credential: WordPressSiteCredential) {
+    if (!confirm(`Disconnect ${credential.label || credential.site_url || 'this WordPress site'}? That site will need to reconnect before it can use Waytrace again.`)) return
+    setRevokingCredentialId(credential.id)
+    try {
+      await revokeWordPressSiteCredential(credential.id)
+      setSiteCredentials((rows) => rows.map((row) =>
+        row.id === credential.id ? { ...row, revoked_at: new Date().toISOString(), revoke_reason: 'owner_revoked' } : row
+      ))
+    } catch (err) {
+      setBanner({ kind: 'error', message: err instanceof Error ? err.message : 'Failed to disconnect WordPress site' })
+    } finally {
+      setRevokingCredentialId(null)
+    }
+  }
+
+  async function handlePluginDownload() {
+    setDownloadingPlugin(true)
+    try {
+      // Download grants expire after five minutes, so obtain one at click time.
+      const latest = await getPluginInfo()
+      if (!latest) throw new Error('No licensed Waytrace Pro release is available for this account')
+      setPlugin(latest)
+      window.location.assign(latest.download_url)
+    } catch (err) {
+      setBanner({ kind: 'error', message: err instanceof Error ? err.message : 'Failed to authorize plugin download' })
+    } finally {
+      setDownloadingPlugin(false)
     }
   }
 
@@ -222,12 +260,61 @@ export default function Integrations() {
               Install the Waytrace plugin and sign in with this same account — your workspaces, links, and
               campaign data all appear right inside your WordPress admin. Nothing to re-enter, and it stays in sync.
             </p>
-            <a href={plugin.download_url} className={`${buttonVariants()} w-fit`}>
-              Download plugin · v{plugin.version}
-            </a>
+            <Button className="w-fit" disabled={downloadingPlugin} onClick={handlePluginDownload}>
+              {downloadingPlugin ? 'Authorizing download...' : `Download plugin · v${plugin.version}`}
+            </Button>
             <p className="mono text-[0.7rem] leading-relaxed text-slate">
               In WordPress: Plugins → Add New → Upload Plugin → choose the .zip → Activate → connect with your Waytrace email and password.
             </p>
+          </CardContent>
+        </Card>
+      )}
+
+      {me && me.user_id == null && (
+        <Card className="max-w-2xl">
+          <CardHeader>
+            <CardTitle>Connected WordPress sites</CardTitle>
+            <CardDescription>
+              Each site has its own credential. Disconnecting one site does not sign out the dashboard or affect other sites.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="flex flex-col gap-3">
+            {siteCredentials.length === 0 ? (
+              <p className="text-sm text-muted-foreground">
+                No site-specific connections yet. Install or update Waytrace Pro to 2.4.5, then connect from WordPress.
+              </p>
+            ) : (
+              siteCredentials.map((credential) => (
+                <div key={credential.id} className="flex items-center justify-between gap-4 border-b border-border py-3 last:border-0">
+                  <div className="flex min-w-0 flex-col gap-1">
+                    <span className="truncate text-sm font-medium">
+                      {credential.label || credential.site_url || `WordPress site ${credential.id}`}
+                    </span>
+                    {credential.site_url && <span className="mono truncate text-xs text-slate">{credential.site_url}</span>}
+                    <span className="text-xs text-muted-foreground">
+                      {credential.last_used_at
+                        ? `Last used ${new Date(credential.last_used_at).toLocaleString()}`
+                        : `Connected ${new Date(credential.created_at).toLocaleDateString()}`}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Badge variant={credential.revoked_at ? 'secondary' : 'success'}>
+                      {credential.revoked_at ? 'Disconnected' : 'Active'}
+                    </Badge>
+                    {!credential.revoked_at && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        disabled={revokingCredentialId === credential.id}
+                        onClick={() => handleRevokeSite(credential)}
+                      >
+                        {revokingCredentialId === credential.id ? 'Disconnecting...' : 'Disconnect'}
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              ))
+            )}
           </CardContent>
         </Card>
       )}

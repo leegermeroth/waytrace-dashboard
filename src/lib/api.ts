@@ -47,6 +47,8 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
 
 export interface AuthResponse {
   api_token: string
+  expires_at?: string
+  credential_type?: 'browser_session'
   tier: string
   subscription_status: string
   // Present only when an invited Team user authenticates (login / accept-invite).
@@ -74,7 +76,7 @@ export function acceptInvite(token: string, password: string, name?: string) {
 export function loginAccount(email: string, password: string) {
   return request<AuthResponse>('/api/v1/auth/login', {
     method: 'POST',
-    body: JSON.stringify({ email, password }),
+    body: JSON.stringify({ email, password, client_type: 'dashboard' }),
   })
 }
 
@@ -274,9 +276,8 @@ export interface Me {
   email: string | null
   tier: string
   max_clients: number
-  // Present only for the account owner. Invited Team users never receive the
-  // account's master token (the Worker strips it).
-  api_token: string | null
+  // Always null after Session 7. Reusable owner tokens are never exposed.
+  api_token: null
   subscription_status: string
   stripe_customer_id: string | null
   stripe_subscription_id: string | null
@@ -321,7 +322,14 @@ export function setOrgType(org_type: string) {
 }
 
 export function changePassword(current_password: string, new_password: string) {
-  return request<{ ok: boolean }>('/api/v1/me/change-password', {
+  return request<{
+    ok: boolean
+    api_token: string
+    expires_at: string
+    revoked_browser_sessions: number
+    wordpress_sites_preserved: boolean
+    legacy_owner_token_rotated: boolean
+  }>('/api/v1/me/change-password', {
     method: 'POST',
     body: JSON.stringify({ current_password, new_password }),
   })
@@ -517,13 +525,35 @@ export interface PluginInfo {
   min_php_version: string | null
   tested_wp_version: string | null
   changelog: string | null
-  // Pre-built, token-authenticated download URL for the current release zip.
+  // Pre-built URL containing only a five-minute release-bound download grant.
   download_url: string
+  download_grant_expires_at: string
 }
 
 /** Current waytrace-pro release for this account (null if ineligible / no release). */
 export function getPluginInfo() {
   return request<PluginInfo | null>('/api/v1/updates/waytrace-pro')
+}
+
+export interface WordPressSiteCredential {
+  id: number
+  credential_type: 'wordpress_site'
+  scopes: string
+  label: string | null
+  site_url: string | null
+  expires_at: string
+  last_used_at: string | null
+  revoked_at: string | null
+  revoke_reason: string | null
+  created_at: string
+}
+
+export function listWordPressSiteCredentials() {
+  return request<WordPressSiteCredential[]>('/api/v1/me/credentials')
+}
+
+export function revokeWordPressSiteCredential(id: number) {
+  return request<{ id: number; revoked: boolean }>(`/api/v1/me/credentials/${id}`, { method: 'DELETE' })
 }
 
 // ── GA4 integration (v1.23) ──────────────────────────────────────────────────
