@@ -7,7 +7,18 @@ import {
   acceptInvite as acceptInviteApi,
   getMe,
   markOnboarded as markOnboardedApi,
+  ApiError,
 } from '@/lib/api'
+import { onUnauthorized } from '@/lib/session'
+
+/**
+ * Auth lifecycle (#33). Protected content renders only once identity is
+ * validated — never on the mere presence of a stored token.
+ *  - 'checking'      — a token exists but /me has not yet confirmed it.
+ *  - 'authenticated' — /me (or a fresh sign-in) confirmed the session.
+ *  - 'anonymous'     — no session; ProtectedRoute sends the user to /login.
+ */
+export type AuthStatus = 'checking' | 'authenticated' | 'anonymous'
 
 /**
  * The authenticated principal's role:
@@ -33,6 +44,8 @@ interface AuthState {
 }
 
 interface AuthContextValue extends AuthState {
+  /** Auth lifecycle state — ProtectedRoute gates rendering on this. */
+  status: AuthStatus
   isAuthenticated: boolean
   /** True for owner or invited admin — anyone who can manage the account. */
   canAdminister: boolean
@@ -93,6 +106,12 @@ function loadStoredAuth(): AuthState {
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [auth, setAuth] = useState<AuthState>(loadStoredAuth)
+  // A stored token starts as 'checking' — it must be validated by /me before any
+  // protected content renders. No token → 'anonymous'. A fresh sign-in sets
+  // 'authenticated' directly (its auth response already validated the credential).
+  const [status, setStatus] = useState<AuthStatus>(() =>
+    loadStoredAuth().apiToken ? 'checking' : 'anonymous'
+  )
   // Onboarding flag is intentionally NOT persisted: undefined = unknown (not yet
   // loaded from /me), string = onboarded, null = never onboarded. Only /me sets it.
   const [onboardedAt, setOnboardedAt] = useState<string | null | undefined>(undefined)
@@ -100,6 +119,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const persist = useCallback((next: AuthState) => {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(next))
     setAuth(next)
+    setStatus('authenticated')
+  }, [])
+
+  // Central session teardown: drop stored credentials and fall to 'anonymous'.
+  // Used by logout, by a failed identity check, and by the API client's 401 hook.
+  const clearSession = useCallback(() => {
+    localStorage.removeItem(STORAGE_KEY)
+    setAuth(EMPTY_AUTH)
+    setOnboardedAt(undefined)
+    setStatus('anonymous')
   }, [])
 
   const login = useCallback(async (email: string, password: string) => {
@@ -165,11 +194,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     })
   }, [persist])
 
-  const logout = useCallback(() => {
-    localStorage.removeItem(STORAGE_KEY)
-    setAuth(EMPTY_AUTH)
-    setOnboardedAt(undefined)
-  }, [])
+  const logout = clearSession
 
   const replaceSession = useCallback((apiToken: string, expiresAt: string) => {
     setAuth((prev) => {
@@ -190,12 +215,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, [])
 
-  // Re-hydrate role/tier authoritatively from /me on mount. localStorage gives
-  // an instant (possibly stale) value so the role-gated UI doesn't flash; this
-  // corrects it — e.g. an admin was demoted to contributor server-side, or a
-  // pre-existing owner session was stored before roles existed.
+  // Any token-bearing 401 the API client sees mid-session (revoked/expired/
+  // deactivated credential) invalidates the session centrally.
+  useEffect(() => onUnauthorized(clearSession), [clearSession])
+
+  // Validate the stored token with /me before rendering protected content, and
+  // re-hydrate role/tier/platform authoritatively. A failed identity check is no
+  // longer swallowed: a 401/403 clears the session (a revoked/expired/deactivated
+  // token can never leave the user in a protected shell), and a transient
+  // network/5xx error drops to 'anonymous' without discarding the token, so a
+  // reload or recovered server can re-validate.
   useEffect(() => {
-    if (!auth.apiToken) return
+    if (!auth.apiToken) {
+      setStatus('anonymous')
+      return
+    }
     let cancelled = false
     getMe()
       .then((me) => {
@@ -209,9 +243,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           localStorage.setItem(STORAGE_KEY, JSON.stringify(next))
           return next
         })
+        setStatus('authenticated')
       })
-      .catch(() => {
-        // Ignore — a failed /me shouldn't log the user out here.
+      .catch((err) => {
+        if (cancelled) return
+        if (err instanceof ApiError && (err.status === 401 || err.status === 403)) {
+          // Definitive: the credential is no longer valid — clear it.
+          clearSession()
+        } else {
+          // Transient (network / 5xx). Don't render protected content without a
+          // successful /me, but keep the token so a retry/reload can re-validate.
+          setStatus('anonymous')
+        }
       })
     return () => {
       cancelled = true
@@ -232,8 +275,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     <AuthContext.Provider
       value={{
         ...auth,
+        status,
         role: effectiveRole,
-        isAuthenticated: Boolean(auth.apiToken),
+        // Derived from the validated lifecycle — never from a bare stored token.
+        isAuthenticated: status === 'authenticated',
         canAdminister: effectiveRole === 'owner' || effectiveRole === 'admin',
         isContributor: effectiveRole === 'contributor',
         isEnterprise: auth.tier === 'enterprise',

@@ -1,3 +1,5 @@
+import { notifyUnauthorized } from './session'
+
 const API_URL = import.meta.env.VITE_API_URL
 
 export class ApiError extends Error {
@@ -6,6 +8,17 @@ export class ApiError extends Error {
     super(message)
     this.status = status
   }
+}
+
+/**
+ * A token-bearing request that comes back 401 means the credential was revoked,
+ * expired, or its account deactivated mid-session. Tell AuthContext to clear the
+ * session so ProtectedRoute returns the user to /login. Only fires when a token
+ * was actually sent, so the pre-auth login POST's own 401 (bad password) never
+ * triggers a logout/redirect loop.
+ */
+function reportAuthFailure(status: number, hadToken: boolean): void {
+  if (status === 401 && hadToken) notifyUnauthorized()
 }
 
 interface ApiEnvelope<T> {
@@ -26,11 +39,12 @@ function authHeaders(): Record<string, string> {
 }
 
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
+  const auth = authHeaders()
   const res = await fetch(`${API_URL}${path}`, {
     ...options,
     headers: {
       'Content-Type': 'application/json',
-      ...authHeaders(),
+      ...auth,
       ...options.headers,
     },
   })
@@ -38,6 +52,7 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   const body: ApiEnvelope<T> | null = await res.json().catch(() => null)
 
   if (!res.ok || !body?.success) {
+    reportAuthFailure(res.status, Boolean(auth.Authorization))
     const message = body?.error || `Request failed with status ${res.status}`
     throw new ApiError(message, res.status)
   }
@@ -396,22 +411,30 @@ export interface CustomDomain {
 }
 
 export async function listDomains(): Promise<{ domains: CustomDomain[]; cnameTarget: string }> {
+  const auth = authHeaders()
   const res = await fetch(`${import.meta.env.VITE_API_URL}/api/v1/domains`, {
-    headers: { 'Content-Type': 'application/json', ...authHeaders() },
+    headers: { 'Content-Type': 'application/json', ...auth },
   })
   const body = await res.json() as { success: boolean; data: CustomDomain[]; cname_target: string; error?: string }
-  if (!res.ok || !body.success) throw new Error(body.error ?? 'Failed to load domains')
+  if (!res.ok || !body.success) {
+    reportAuthFailure(res.status, Boolean(auth.Authorization))
+    throw new Error(body.error ?? 'Failed to load domains')
+  }
   return { domains: body.data, cnameTarget: body.cname_target }
 }
 
 export async function createDomain(hostname: string): Promise<{ domain: CustomDomain; cnameTarget: string }> {
+  const auth = authHeaders()
   const res = await fetch(`${import.meta.env.VITE_API_URL}/api/v1/domains`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...authHeaders() },
+    headers: { 'Content-Type': 'application/json', ...auth },
     body: JSON.stringify({ hostname }),
   })
   const body = await res.json() as { success: boolean; data: CustomDomain; cname_target: string; error?: string }
-  if (!res.ok || !body.success) throw new Error(body.error ?? 'Failed to add domain')
+  if (!res.ok || !body.success) {
+    reportAuthFailure(res.status, Boolean(auth.Authorization))
+    throw new Error(body.error ?? 'Failed to add domain')
+  }
   return { domain: body.data, cnameTarget: body.cname_target }
 }
 
@@ -909,15 +932,17 @@ export async function bulkCreateAssets(
   rows: (AssetRowInput | PersonRowInput)[],
   utm?: { utm_source?: string; utm_medium?: string; utm_campaign?: string }
 ): Promise<{ created: number; assets: CollectionAsset[] }> {
+  const auth = authHeaders()
   const res = await fetch(`${API_URL}/api/v1/collections/${collectionId}/assets/bulk`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...authHeaders() },
+    headers: { 'Content-Type': 'application/json', ...auth },
     body: JSON.stringify({ rows, ...utm }),
   })
   const body = await res.json().catch(() => null) as
     | { success: boolean; data?: { created: number; assets: CollectionAsset[] }; error?: string; errors?: BulkRowError[] }
     | null
   if (!res.ok || !body?.success || !body.data) {
+    reportAuthFailure(res.status, Boolean(auth.Authorization))
     const message = body?.error || `Request failed with status ${res.status}`
     if (body?.errors?.length) throw new BulkValidationError(message, res.status, body.errors)
     throw new ApiError(message, res.status)
