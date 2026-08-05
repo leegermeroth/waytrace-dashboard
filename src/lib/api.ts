@@ -352,6 +352,24 @@ export interface Me {
   // we tell an invited user apart from the account owner.
   user_id?: number
   role?: 'admin' | 'contributor'
+  // Current cancellation state (#11), or null if the account has never cancelled.
+  // Drives accurate Billing copy: grace-period retention, a failed refund needing
+  // retry, or a scheduled period-end cancellation.
+  cancellation?: CancellationView | null
+}
+
+export type ServiceState = 'pending' | 'cancel_at_period_end' | 'cancelled_immediately' | 'failed'
+export type RefundState = 'not_applicable' | 'pending' | 'succeeded' | 'failed'
+export type DataState = 'active' | 'grace_period' | 'purge_scheduled' | 'restored' | 'deleted'
+
+export interface CancellationView {
+  service_state: ServiceState
+  refund_state: RefundState
+  data_state: DataState
+  within_refund_window: boolean
+  grace_period_ends_at: string | null
+  data_deleted_at: string | null
+  requested_at: string
 }
 
 export function getMe() {
@@ -450,9 +468,36 @@ export function createPortalSession() {
   })
 }
 
+export interface CancelResult {
+  effective: 'immediate' | 'period_end'
+  refunded: boolean
+  refund_state?: RefundState
+  deleted: boolean
+  data_retained: boolean
+  grace_period_ends_at?: string | null
+  cancellation?: CancellationView | null
+  idempotent?: boolean
+}
+
+// #11: cancellation NEVER deletes data inline. Within the refund window it stops
+// billing, refunds, and retains data in a reversible grace period; after the
+// window it schedules a period-end cancellation. Deletion is a separate step.
 export function cancelSubscription() {
-  return request<{ refunded: boolean; deleted: boolean; effective: 'immediate' | 'period_end' }>(
-    '/api/v1/billing/cancel',
+  return request<CancelResult>('/api/v1/billing/cancel', { method: 'POST', body: JSON.stringify({}) })
+}
+
+/** Retry a pending/failed refund without touching data. Idempotent server-side. */
+export function retryRefund() {
+  return request<{ refund_state: RefundState; cancellation: CancellationView | null }>(
+    '/api/v1/billing/cancel/retry-refund',
+    { method: 'POST', body: JSON.stringify({}) }
+  )
+}
+
+/** Grace-period recovery: keep the account's retained data (cancels any purge). */
+export function restoreData() {
+  return request<{ restored: boolean; cancellation: CancellationView | null }>(
+    '/api/v1/billing/restore',
     { method: 'POST', body: JSON.stringify({}) }
   )
 }

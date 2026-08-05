@@ -5,6 +5,8 @@ import {
   createPortalSession,
   enterpriseInquiry,
   getMe,
+  retryRefund,
+  restoreData,
   type Me,
 } from '@/lib/api'
 import { Button } from '@/components/ui/button'
@@ -36,6 +38,14 @@ function withinRefundWindow(subscriptionStartedAt: string | null | undefined): b
   if (!subscriptionStartedAt) return false
   const startedAt = new Date(subscriptionStartedAt).getTime()
   return Date.now() - startedAt <= REFUND_WINDOW_DAYS * 24 * 60 * 60 * 1000
+}
+
+function formatDate(iso: string | null | undefined): string {
+  if (!iso) return ''
+  const d = new Date(iso)
+  return Number.isNaN(d.getTime())
+    ? ''
+    : d.toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' })
 }
 
 // Labels and display prices only. The Worker owns the Stripe Price catalog and
@@ -81,6 +91,8 @@ export default function Billing() {
   const [cancelConfirmText, setCancelConfirmText] = useState('')
   const [isCancelling, setIsCancelling] = useState(false)
   const [cancelResult, setCancelResult] = useState<string | null>(null)
+  const [isRetryingRefund, setIsRetryingRefund] = useState(false)
+  const [isRestoring, setIsRestoring] = useState(false)
 
   // Enterprise inquiry form.
   const [entName, setEntName] = useState('')
@@ -155,11 +167,19 @@ export default function Billing() {
     setIsCancelling(true)
     try {
       const result = await cancelSubscription()
-      setCancelResult(
-        result.effective === 'immediate'
-          ? `Subscription cancelled${result.refunded ? ' and refunded' : ''}. Your workspaces, links, and click history have been permanently deleted.`
-          : "Subscription will cancel at the end of your current billing period. You'll keep full access until then, and your data stays intact — no refund is issued for cancellations after the 14-day window."
-      )
+      if (result.effective === 'immediate') {
+        const retained = result.grace_period_ends_at
+          ? ` Your workspaces, links, and click history are retained until ${formatDate(result.grace_period_ends_at)} — restore them any time before then.`
+          : ' Your workspaces, links, and click history are retained so you can restore them.'
+        const refundNote = result.refunded
+          ? ' Your latest payment has been refunded.'
+          : " We couldn't process your refund automatically — you can retry it below."
+        setCancelResult(`Subscription cancelled and you've been moved to the Free plan.${refundNote}${retained}`)
+      } else {
+        setCancelResult(
+          "Subscription will cancel at the end of your current billing period. You'll keep full access until then, and your data stays intact — no refund is issued for cancellations after the 14-day window."
+        )
+      }
       setCancelDialogOpen(false)
       load()
     } catch (err) {
@@ -169,7 +189,42 @@ export default function Billing() {
     }
   }
 
+  async function handleRetryRefund() {
+    setError(null)
+    setIsRetryingRefund(true)
+    try {
+      const result = await retryRefund()
+      setCancelResult(
+        result.refund_state === 'succeeded'
+          ? 'Your refund has been processed.'
+          : "We still couldn't process the refund. Please try again shortly or contact support."
+      )
+      load()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to retry the refund')
+    } finally {
+      setIsRetryingRefund(false)
+    }
+  }
+
+  async function handleRestore() {
+    setError(null)
+    setIsRestoring(true)
+    try {
+      await restoreData()
+      setCancelResult('Your data has been kept. Resubscribe any time to regain full access.')
+      load()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to restore your data')
+    } finally {
+      setIsRestoring(false)
+    }
+  }
+
   const inWindow = withinRefundWindow(me?.subscription_started_at)
+  const cancellation = me?.cancellation ?? null
+  const inGracePeriod = cancellation?.data_state === 'grace_period' || cancellation?.data_state === 'purge_scheduled'
+  const refundFailed = cancellation?.refund_state === 'failed'
 
   return (
     <div className="flex flex-col gap-6">
@@ -317,14 +372,55 @@ export default function Billing() {
         </CardContent>
       </Card>
 
-      {me?.stripe_subscription_id && (
+      {/* Reversible grace period after an immediate cancellation — data is retained, not deleted. */}
+      {inGracePeriod && (
+        <Card className="max-w-xl">
+          <CardHeader>
+            <CardTitle>Your data is retained</CardTitle>
+            <CardDescription>
+              {cancellation?.grace_period_ends_at
+                ? `Your subscription is cancelled, but your workspaces, links, and click history are kept until ${formatDate(cancellation.grace_period_ends_at)}. Restore them to keep them, or resubscribe above to regain full access. Nothing has been deleted.`
+                : 'Your subscription is cancelled, but your workspaces, links, and click history are retained. Restore them to keep them, or resubscribe above to regain full access. Nothing has been deleted.'}
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="flex flex-col gap-3">
+            {refundFailed && (
+              <Alert variant="destructive">
+                <AlertDescription>
+                  We couldn't process your refund automatically. Your data is safe — you can retry the refund
+                  below, and it will never affect your retained data.
+                </AlertDescription>
+              </Alert>
+            )}
+            {cancelResult && (
+              <Alert>
+                <AlertDescription>{cancelResult}</AlertDescription>
+              </Alert>
+            )}
+          </CardContent>
+          <CardFooter className="flex flex-wrap gap-3">
+            <Button onClick={handleRestore} disabled={isRestoring}>
+              {isRestoring ? 'Keeping your data…' : 'Keep my data'}
+            </Button>
+            {refundFailed && (
+              <Button variant="outline" onClick={handleRetryRefund} disabled={isRetryingRefund}>
+                {isRetryingRefund ? 'Retrying refund…' : 'Retry refund'}
+              </Button>
+            )}
+          </CardFooter>
+        </Card>
+      )}
+
+      {me?.stripe_subscription_id && !inGracePeriod && (
         <Card className="max-w-xl">
           <CardHeader>
             <CardTitle>Cancel subscription</CardTitle>
             <CardDescription>
-              {inWindow
-                ? `You're within the ${REFUND_WINDOW_DAYS}-day refund window. Cancelling now refunds your payment in full and immediately, permanently deletes all your workspaces, links, and click history.`
-                : "You're past the refund window. Cancelling stops future billing at the end of your current period — your data is not deleted and existing links keep working."}
+              {cancellation?.service_state === 'cancel_at_period_end'
+                ? "Your subscription is scheduled to cancel at the end of your current billing period. You keep full access until then, and your data stays intact."
+                : inWindow
+                  ? `You're within the ${REFUND_WINDOW_DAYS}-day refund window. Cancelling now stops billing immediately and refunds your latest payment in full. Your workspaces, links, and click history are kept for ${REFUND_WINDOW_DAYS === 14 ? '30 days' : 'a grace period'} so you can restore them — nothing is deleted right away.`
+                  : "You're past the refund window. Cancelling stops future billing at the end of your current period — no refund is issued, your data is not deleted, and existing links keep working."}
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -348,7 +444,7 @@ export default function Billing() {
             <DialogTitle>Cancel your subscription?</DialogTitle>
             <DialogDescription>
               {inWindow
-                ? 'This immediately cancels your subscription, refunds your payment in full, and permanently deletes all workspaces, links, and click history. This cannot be undone.'
+                ? 'This immediately cancels your subscription and refunds your latest payment in full. You move to the Free plan, and your workspaces, links, and click history are retained for a grace period so you can restore them — nothing is deleted right away.'
                 : "This schedules cancellation for the end of your current billing period. You'll keep access until then, no refund is issued, and your data is kept."}
             </DialogDescription>
           </DialogHeader>
