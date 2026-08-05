@@ -11,6 +11,7 @@ import AcceptInvite from '@/pages/AcceptInvite'
 import CheckEmail from '@/pages/CheckEmail'
 import ForgotPassword from '@/pages/ForgotPassword'
 import ResetPassword from '@/pages/ResetPassword'
+import VerifyEmailChange from '@/pages/VerifyEmailChange'
 import Terms from '@/pages/Terms'
 import Privacy from '@/pages/Privacy'
 import Dashboard from '@/pages/Dashboard'
@@ -46,6 +47,7 @@ export default function App() {
           <Route path="/check-email" element={<CheckEmail />} />
           <Route path="/forgot-password" element={<ForgotPassword />} />
           <Route path="/reset-password" element={<ResetPassword />} />
+          <Route path="/verify-email" element={<VerifyEmailChange />} />
           <Route path="/terms" element={<Terms />} />
           <Route path="/privacy" element={<Privacy />} />
           <Route element={<ProtectedRoute />}>

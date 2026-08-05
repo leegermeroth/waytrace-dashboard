@@ -7,7 +7,9 @@ import {
   acceptInvite as acceptInviteApi,
   getMe,
   markOnboarded as markOnboardedApi,
+  isOrgSelection,
   ApiError,
+  type LoginResult,
 } from '@/lib/api'
 import { onUnauthorized } from '@/lib/session'
 
@@ -64,7 +66,17 @@ interface AuthContextValue extends AuthState {
   needsOnboarding: boolean
   /** Stamp the onboarding flag server-side and locally so the wizard won't re-open. */
   markOnboarded: () => Promise<void>
-  login: (email: string, password: string) => Promise<void>
+  /**
+   * Sign in. Resolves to the raw login result: on success the session is persisted
+   * and `org_selection_required` is absent; when the email maps to more than one
+   * login it resolves with `{ org_selection_required, memberships }` and no session
+   * is stored — call again with `selection` to choose.
+   */
+  login: (
+    email: string,
+    password: string,
+    selection?: { account_id: number; user_id: number | null }
+  ) => Promise<LoginResult>
   register: (email: string, password: string, name?: string) => Promise<void>
   completeSetup: (token: string, password: string) => Promise<void>
   completeReset: (token: string, password: string) => Promise<void>
@@ -131,20 +143,30 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setStatus('anonymous')
   }, [])
 
-  const login = useCallback(async (email: string, password: string) => {
-    const result = await loginAccount(email, password)
-    persist({
-      apiToken: result.api_token,
-      sessionExpiresAt: result.expires_at ?? null,
-      tier: result.tier,
-      subscriptionStatus: result.subscription_status,
-      // The Worker only returns `role` for invited Team users; an account owner
-      // gets no role field and is treated as full admin.
-      role: result.role ?? 'owner',
-      // Auth responses don't carry the platform flag — /me syncs it on mount.
-      isPlatformAdmin: false,
-    })
-  }, [persist])
+  const login = useCallback(
+    async (
+      email: string,
+      password: string,
+      selection?: { account_id: number; user_id: number | null }
+    ): Promise<LoginResult> => {
+      const result = await loginAccount(email, password, selection)
+      // Ambiguous login — hand the choice back to the caller, persist nothing.
+      if (isOrgSelection(result)) return result
+      persist({
+        apiToken: result.api_token,
+        sessionExpiresAt: result.expires_at ?? null,
+        tier: result.tier,
+        subscriptionStatus: result.subscription_status,
+        // The Worker only returns `role` for invited Team users; an account owner
+        // gets no role field and is treated as full admin.
+        role: result.role ?? 'owner',
+        // Auth responses don't carry the platform flag — /me syncs it on mount.
+        isPlatformAdmin: false,
+      })
+      return result
+    },
+    [persist]
+  )
 
   const register = useCallback(async (email: string, password: string, name?: string) => {
     const result = await registerAccount(email, password, name)

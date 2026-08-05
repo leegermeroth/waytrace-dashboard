@@ -74,6 +74,26 @@ export interface AuthResponse {
   email?: string
 }
 
+/** One login this email+password can sign into (org-selection contract, #15). */
+export interface OrgMembership {
+  account_id: number
+  user_id: number | null
+  org_name: string
+  role: 'owner' | 'admin' | 'contributor'
+}
+
+/** Returned when the credentials match more than one login and a choice is required. */
+export interface OrgSelectionResponse {
+  org_selection_required: true
+  memberships: OrgMembership[]
+}
+
+export type LoginResult = AuthResponse | OrgSelectionResponse
+
+export function isOrgSelection(r: LoginResult): r is OrgSelectionResponse {
+  return (r as OrgSelectionResponse).org_selection_required === true
+}
+
 export function registerAccount(email: string, password: string, name?: string) {
   return request<AuthResponse>('/api/v1/auth/register', {
     method: 'POST',
@@ -88,10 +108,24 @@ export function acceptInvite(token: string, password: string, name?: string) {
   })
 }
 
-export function loginAccount(email: string, password: string) {
-  return request<AuthResponse>('/api/v1/auth/login', {
+/**
+ * Sign in. When the email+password resolve to more than one login, the Worker
+ * returns an org-selection response (no token); call again with `selection` to
+ * choose the principal. Use `isOrgSelection(result)` to discriminate.
+ */
+export function loginAccount(
+  email: string,
+  password: string,
+  selection?: { account_id: number; user_id: number | null }
+) {
+  return request<LoginResult>('/api/v1/auth/login', {
     method: 'POST',
-    body: JSON.stringify({ email, password, client_type: 'dashboard' }),
+    body: JSON.stringify({
+      email,
+      password,
+      client_type: 'dashboard',
+      ...(selection ? { account_id: selection.account_id, user_id: selection.user_id } : {}),
+    }),
   })
 }
 
@@ -310,6 +344,10 @@ export interface Me {
   // Always 0 for invited Team users — the flag belongs to the owner's login only.
   is_platform_admin: number
   created_at: string
+  // A pending, not-yet-verified email change (#14). NULL when none is in flight.
+  // The current `email` stays authoritative until the new address is confirmed.
+  pending_email?: string | null
+  pending_email_expires?: string | null
   // Present only when the caller is an invited Team user. Their presence is how
   // we tell an invited user apart from the account owner.
   user_id?: number
@@ -350,10 +388,31 @@ export function changePassword(current_password: string, new_password: string) {
   })
 }
 
-export function changeEmail(new_email: string) {
-  return request<Me>('/api/v1/me/change-email', {
+/**
+ * Start a verified email change (#14). Requires the current password; the new
+ * address must confirm before it takes effect. Returns the pending state, not a
+ * finished change.
+ */
+export function changeEmail(new_email: string, current_password: string) {
+  return request<{ pending_email: string; pending_email_expires: string; verification_sent: boolean }>(
+    '/api/v1/me/change-email',
+    { method: 'POST', body: JSON.stringify({ new_email, current_password }) }
+  )
+}
+
+/** Cancel an in-flight (unverified) email change. */
+export function cancelEmailChange() {
+  return request<{ cancelled: boolean }>('/api/v1/me/change-email/cancel', {
     method: 'POST',
-    body: JSON.stringify({ new_email }),
+    body: JSON.stringify({}),
+  })
+}
+
+/** Confirm a pending email change from the link sent to the new address (public). */
+export function verifyEmailChange(token: string) {
+  return request<{ email: string }>('/api/v1/auth/verify-email-change', {
+    method: 'POST',
+    body: JSON.stringify({ token }),
   })
 }
 
