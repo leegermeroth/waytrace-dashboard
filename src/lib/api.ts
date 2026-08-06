@@ -611,7 +611,11 @@ export interface AnalyticsTopLink {
 }
 
 export interface Analytics {
-  totals: { total: number; clicks: number; scans: number }
+  // total = human interactions (clicks + scans, bots excluded). scans = QR + NFC
+  // (a "scan" is any physical-medium interaction); qr / nfc break that down.
+  // bots = flagged automation, reported separately, never folded into the above
+  // (audit #22/#25 — see the Worker analytics route + SESSION_13 decision doc).
+  totals: { total: number; clicks: number; scans: number; qr: number; nfc: number; bots: number }
   timeseries: { day: string; clicks: number; scans: number }[]
   bySource: AnalyticsDimensionRow[]
   byMedium: AnalyticsDimensionRow[]

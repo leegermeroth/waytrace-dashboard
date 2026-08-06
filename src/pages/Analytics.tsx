@@ -196,7 +196,7 @@ export default function Analytics() {
       .catch(() => setGa4(null))
   }, [workspace, source, medium, campaign, content, range])
 
-  const totals = data?.totals ?? { total: 0, clicks: 0, scans: 0 }
+  const totals = data?.totals ?? { total: 0, clicks: 0, scans: 0, qr: 0, nfc: 0, bots: 0 }
   const rangeLabel = RANGES.find((r) => r.value === range)?.label ?? ''
   const ga4Source = useMemo(() => ga4Lookup(ga4?.bySource), [ga4])
   const ga4Medium = useMemo(() => ga4Lookup(ga4?.byMedium), [ga4])
@@ -207,7 +207,7 @@ export default function Analytics() {
       <PageHeader
         eyebrow="Insights"
         title="Analytics"
-        description="Clicks and QR scans across your links — filtered by workspace, campaign, source, medium, and time."
+        description="Human clicks and scans (QR + NFC) across your links — filtered by workspace, campaign, source, medium, and time. Known bots and link scanners are counted separately, never mixed in."
       />
 
       {/* Filters */}
@@ -280,11 +280,30 @@ export default function Analytics() {
         </Alert>
       )}
 
-      {/* Totals */}
-      <div className="grid grid-cols-3 gap-4">
-        <StatCard label="Total interactions" value={isLoading ? '—' : totals.total.toLocaleString()} reference />
-        <StatCard label="Link clicks" value={isLoading ? '—' : totals.clicks.toLocaleString()} />
-        <StatCard label="QR scans" value={isLoading ? '—' : totals.scans.toLocaleString()} />
+      {/* Totals — human interactions only; bots reported separately below. */}
+      <div className="flex flex-col gap-2">
+        <div className="grid grid-cols-3 gap-4">
+          <StatCard label="Total interactions" value={isLoading ? '—' : totals.total.toLocaleString()} reference />
+          <StatCard label="Link clicks" value={isLoading ? '—' : totals.clicks.toLocaleString()} />
+          <StatCard label="Scans · QR + NFC" value={isLoading ? '—' : totals.scans.toLocaleString()} />
+        </div>
+        {!isLoading && (totals.nfc > 0 || totals.bots > 0) && (
+          <p className="mono text-[0.7rem] text-slate">
+            {totals.nfc > 0 && (
+              <span>
+                Scans include {totals.qr.toLocaleString()} QR · {totals.nfc.toLocaleString()} NFC tap
+                {totals.nfc === 1 ? '' : 's'}.
+              </span>
+            )}
+            {totals.bots > 0 && (
+              <span>
+                {totals.nfc > 0 ? ' ' : ''}
+                {totals.bots.toLocaleString()} bot/scanner hit{totals.bots === 1 ? '' : 's'} filtered from these
+                totals.
+              </span>
+            )}
+          </p>
+        )}
       </div>
 
       {/* Post-click (GA4) */}
