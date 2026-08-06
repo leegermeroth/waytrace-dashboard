@@ -18,6 +18,7 @@ import {
   type FoundationState,
 } from '@/lib/trackingFoundation'
 import { TrackingFoundation } from '@/components/TrackingFoundation'
+import { dnsRelativeName } from '@/lib/dns'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -372,11 +373,14 @@ export function OnboardingWizard() {
                   </p>
                   <div className="rounded bg-background px-3 py-2 font-mono text-xs leading-relaxed">
                     <div><span className="text-muted-foreground">Type:</span> CNAME</div>
-                    <div><span className="text-muted-foreground">Name:</span> {createdDomain.domain.hostname.split('.')[0]}</div>
+                    <div><span className="text-muted-foreground">Name:</span> {dnsRelativeName(createdDomain.domain.hostname)}</div>
                     <div><span className="text-muted-foreground">Value:</span> {createdDomain.cnameTarget}</div>
                   </div>
                   <p className="text-xs text-muted-foreground">
-                    You can always find this again under Settings → Domains.
+                    Use <span className="mono">{dnsRelativeName(createdDomain.domain.hostname)}</span> for the name (the part
+                    before your root domain), or the full host{' '}
+                    <span className="mono">{createdDomain.domain.hostname}</span> if your provider prefers that. You can always
+                    find this again under Settings → Domains.
                   </p>
                 </div>
               )}

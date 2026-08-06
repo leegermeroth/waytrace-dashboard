@@ -7,6 +7,7 @@ import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { PageHeader } from '@/components/brand'
+import { dnsRelativeName } from '@/lib/dns'
 
 export default function Domains() {
   const [domains, setDomains] = useState<CustomDomain[]>([])
@@ -115,9 +116,14 @@ export default function Domains() {
                   <p className="font-medium mb-2">Domain added. Add this DNS record at your registrar:</p>
                   <div className="rounded bg-muted px-3 py-2 font-mono text-xs leading-relaxed">
                     <div><span className="text-muted-foreground">Type:</span> CNAME</div>
-                    <div><span className="text-muted-foreground">Name:</span> {addSuccess.domain.hostname.split('.')[0]}</div>
+                    <div><span className="text-muted-foreground">Name:</span> {dnsRelativeName(addSuccess.domain.hostname)}</div>
                     <div><span className="text-muted-foreground">Value:</span> {addSuccess.cnameTarget}</div>
                   </div>
+                  <p className="text-xs text-muted-foreground mt-2">
+                    Enter <span className="font-mono">{dnsRelativeName(addSuccess.domain.hostname)}</span> as the name if your
+                    provider asks for the part before your root domain; if it wants the full host, use{' '}
+                    <span className="font-mono">{addSuccess.domain.hostname}</span>.
+                  </p>
                   <p className="text-xs text-muted-foreground mt-2">
                     Status will update to Active once the CNAME propagates (usually a few minutes).
                   </p>
