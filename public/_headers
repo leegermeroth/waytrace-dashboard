@@ -9,14 +9,17 @@
 #   - Stripe checkout / billing portal / Google OAuth are top-level navigations
 #     (window.location), NOT fetch/iframe, so they need no CSP allowance.
 #   - img/worker allow data: and blob: for client-generated QR codes.
+#   - Cloudflare Web Analytics beacon (static.cloudflareinsights.com script +
+#     cloudflareinsights.com report endpoint) is injected by the CDN at the edge
+#     — allowed explicitly (found via the report-only stage, not the repo).
 #
-# ROLLOUT: CSP ships Report-Only first (violations log to the browser console
-# without blocking) so a full click-through can confirm zero violations; then
-# it is promoted to the enforcing Content-Security-Policy header. The other
-# headers are non-breaking and enforce immediately.
+# ROLLOUT: CSP shipped Report-Only first (violations log to the browser console
+# without blocking) so a full click-through confirmed exactly one first-party
+# source to allow (the CF beacon); it is now the enforcing
+# Content-Security-Policy header. The other headers are non-breaking.
 
 /*
-  Content-Security-Policy-Report-Only: default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; form-action 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; connect-src 'self' https://link-manager-worker.lee-1dd.workers.dev; worker-src 'self' blob:; manifest-src 'self'; upgrade-insecure-requests
+  Content-Security-Policy: default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; form-action 'self'; script-src 'self' https://static.cloudflareinsights.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; connect-src 'self' https://link-manager-worker.lee-1dd.workers.dev https://cloudflareinsights.com; worker-src 'self' blob:; manifest-src 'self'; upgrade-insecure-requests
   Strict-Transport-Security: max-age=31536000; includeSubDomains
   X-Content-Type-Options: nosniff
   X-Frame-Options: DENY
