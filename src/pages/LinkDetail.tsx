@@ -374,9 +374,14 @@ export default function LinkDetail() {
   )
 }
 
-/** Format GA4 revenue (property currency unknown — shown as USD, refine later). */
-function fmtRevenue(v: number): string {
-  return v.toLocaleString(undefined, { style: 'currency', currency: 'USD', maximumFractionDigits: 0 })
+/**
+ * Format GA4 revenue in the property's own currency (audit #23 — never assume
+ * USD). A `null` currency means GA4 didn't report one, so show the bare number.
+ */
+function fmtRevenue(v: number | null, currency: string | null): string {
+  if (v === null) return '—'
+  if (!currency) return v.toLocaleString(undefined, { maximumFractionDigits: 0 })
+  return v.toLocaleString(undefined, { style: 'currency', currency, maximumFractionDigits: 0 })
 }
 
 /** Same http(s) check the Worker applies — catch it in the dialog, not on submit. */
@@ -406,6 +411,7 @@ function VariantsPanel({ linkId }: { linkId: number }) {
   const [variants, setVariants] = useState<VariantWithStats[]>([])
   const [noVariant, setNoVariant] = useState<{ clicks: number; scans: number } | null>(null)
   const [ga4ByStamp, setGa4ByStamp] = useState<Map<string, Ga4DimensionRow> | null>(null)
+  const [ga4Currency, setGa4Currency] = useState<string | null>(null)
   const [loaded, setLoaded] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [dialogOpen, setDialogOpen] = useState(false)
@@ -433,6 +439,7 @@ function VariantsPanel({ linkId }: { linkId: number }) {
       .then((report) => {
         if (report.available && report.byContent) {
           setGa4ByStamp(new Map(report.byContent.map((r) => [r.key, r])))
+          setGa4Currency(report.currency ?? null)
         }
       })
       .catch(() => setGa4ByStamp(null))
@@ -557,7 +564,7 @@ function VariantsPanel({ linkId }: { linkId: number }) {
                       )}
                       {showGa4 && (
                         <TableCell className="mono text-right">
-                          {fmtRevenue(ga4Row?.revenue ?? 0)}
+                          {fmtRevenue(ga4Row?.revenue ?? 0, ga4Currency)}
                         </TableCell>
                       )}
                       {canAdminister && (
@@ -843,7 +850,10 @@ function Ga4LinkPanel({ ga4 }: { ga4: Ga4LinkReport }) {
               <StatCard label="Sessions" value={t.sessions.toLocaleString()} />
               <StatCard label="Engaged" value={t.engagedSessions.toLocaleString()} />
               <StatCard label="Key events" value={t.keyEvents.toLocaleString()} />
-              <StatCard label="Revenue" value={fmtRevenue(t.revenue)} />
+              <StatCard
+                label={ga4.currency ? `Revenue · ${ga4.currency}` : 'Revenue'}
+                value={fmtRevenue(t.revenue, ga4.currency ?? null)}
+              />
             </div>
 
             {eng && (t.sessions > 0) && (

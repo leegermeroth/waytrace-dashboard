@@ -746,18 +746,31 @@ export interface Ga4DimensionRow {
   key: string
   sessions: number
   keyEvents: number
-  revenue: number
+  // null when the account's mapped properties report revenue in >1 currency
+  // (audit #23) — summing across currencies is refused, not mislabeled.
+  revenue: number | null
 }
 
 export interface Ga4Aggregate {
   connected: boolean
   mappedWorkspaces: number
   unmappedWorkspaces: number
-  totals: { sessions: number; engagedSessions: number; keyEvents: number; revenue: number }
+  totals: { sessions: number; engagedSessions: number; keyEvents: number; revenue: number | null }
+  // Revenue-currency policy (audit #23): revenueCurrency is the single ISO-4217
+  // code account-level revenue is in (null = none, or currencies disagree);
+  // revenueMixedCurrency true = properties disagree, so every aggregate revenue
+  // figure is null and only per-link revenue (its own currency) is shown.
+  revenueCurrency: string | null
+  revenueMixedCurrency: boolean
+  currencies: string[]
   bySource: Ga4DimensionRow[]
   byMedium: Ga4DimensionRow[]
   byCampaign: Ga4DimensionRow[]
-  byLink: { link_id: number; sessions: number; keyEvents: number; revenue: number }[]
+  byLink: { link_id: number; sessions: number; keyEvents: number; revenue: number; currency: string | null }[]
+  // Completeness (audit #24): truncated = a property's grouped report hit the
+  // paging budget; partial = incomplete for any reason (truncation OR error).
+  truncated: boolean
+  partial: boolean
   errors: { google_email: string; error: string }[]
 }
 
@@ -786,6 +799,11 @@ export interface Ga4LinkReport {
   available: boolean
   reason?: 'no_property' | 'no_connection' | 'no_utms' | 'error'
   property_name?: string
+  // ISO-4217 currency of this link's property (audit #23) — one link = one
+  // property = one currency, so revenue below is always a single valid currency.
+  currency?: string | null
+  // True when a report hit its row limit and some rows are missing (audit #24).
+  partial?: boolean
   totals?: { sessions: number; engagedSessions: number; keyEvents: number; revenue: number }
   timeseries?: { day: string; sessions: number; keyEvents: number }[]
   // Default-mode link-detail breakdowns (best-effort, absent on by='variant').

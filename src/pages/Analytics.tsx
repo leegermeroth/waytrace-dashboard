@@ -60,9 +60,15 @@ function Swatch({ color, label }: { color: string; label: string }) {
   )
 }
 
-/** Format GA4 revenue (property currency unknown — shown as USD, refine later). */
-function fmtRevenue(v: number): string {
-  return v.toLocaleString(undefined, { style: 'currency', currency: 'USD', maximumFractionDigits: 0 })
+/**
+ * Format GA4 revenue in the property's own currency (audit #23 — never assume
+ * USD). `null` value = suppressed because the account spans multiple currencies;
+ * `null` currency = GA4 didn't report one, so show the bare number, unlabeled.
+ */
+function fmtRevenue(v: number | null, currency: string | null): string {
+  if (v === null) return '—'
+  if (!currency) return v.toLocaleString(undefined, { maximumFractionDigits: 0 })
+  return v.toLocaleString(undefined, { style: 'currency', currency, maximumFractionDigits: 0 })
 }
 
 /** A proportional clicks/scans breakdown for one dimension (source, medium, …).
@@ -320,8 +326,22 @@ export default function Analytics() {
           <div className="grid grid-cols-3 gap-4">
             <StatCard label="Sessions" value={ga4.totals.sessions.toLocaleString()} />
             <StatCard label="Key events" value={ga4.totals.keyEvents.toLocaleString()} />
-            <StatCard label="Revenue" value={fmtRevenue(ga4.totals.revenue)} />
+            <StatCard
+              label={ga4.revenueCurrency ? `Revenue · ${ga4.revenueCurrency}` : 'Revenue'}
+              value={fmtRevenue(ga4.totals.revenue, ga4.revenueCurrency)}
+            />
           </div>
+          {ga4.revenueMixedCurrency && (
+            <p className="mono text-[0.7rem] text-slate">
+              Revenue spans multiple currencies ({ga4.currencies.join(', ')}), so no combined total is shown —
+              see each link's own revenue on its stats page.
+            </p>
+          )}
+          {ga4.truncated && (
+            <p className="mono text-[0.7rem] text-destructive">
+              This GA4 report was too large to load in full — some campaigns may be missing. Narrow the date range for a complete view.
+            </p>
+          )}
           {ga4.errors.length > 0 && (
             <p className="mono text-[0.7rem] text-destructive">
               Couldn't load some GA4 data — reconnect {ga4.errors.map((e) => e.google_email).join(', ')} in Integrations.

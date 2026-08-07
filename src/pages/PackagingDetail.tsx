@@ -66,8 +66,11 @@ const CSV_TEMPLATE_EXAMPLES = [
   ['SKYR-STR-5.3', 'Strawberry Skyr', '5.3 oz', '850016377029', 'https://example.com/products/strawberry-skyr'],
 ]
 
-function fmtRevenue(v: number): string {
-  return v.toLocaleString(undefined, { style: 'currency', currency: 'USD', maximumFractionDigits: 0 })
+/** Revenue in the link's own GA4 property currency (audit #23 — never assume USD). */
+function fmtRevenue(v: number | null, currency: string | null): string {
+  if (v === null) return '—'
+  if (!currency) return v.toLocaleString(undefined, { maximumFractionDigits: 0 })
+  return v.toLocaleString(undefined, { style: 'currency', currency, maximumFractionDigits: 0 })
 }
 
 /** A right-aligned stat number that links through to the link's stats page. */
@@ -87,7 +90,7 @@ function StatLink({ linkId, children }: { linkId: number; children: ReactNode })
 interface Ga4Columns {
   /** false = workspace has no GA4 property mapped (render the connect prompt). */
   mapped: boolean
-  byLink: Map<number, { sessions: number; keyEvents: number; revenue: number }>
+  byLink: Map<number, { sessions: number; keyEvents: number; revenue: number; currency: string | null }>
 }
 
 /**
@@ -414,7 +417,7 @@ export default function PackagingDetail() {
                   )}
                   {showGa4 && (
                     <TableCell className="mono text-right text-xs">
-                      <StatLink linkId={asset.link_id}>{fmtRevenue(ga4Row?.revenue ?? 0)}</StatLink>
+                      <StatLink linkId={asset.link_id}>{fmtRevenue(ga4Row?.revenue ?? 0, ga4Row?.currency ?? null)}</StatLink>
                     </TableCell>
                   )}
                   <TableCell>
