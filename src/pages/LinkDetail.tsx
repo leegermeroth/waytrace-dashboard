@@ -112,7 +112,7 @@ export default function LinkDetail() {
 
   async function handleCopyTracking() {
     if (!link) return
-    await navigator.clipboard.writeText(buildTrackingUrl(link.destination_url, link))
+    await navigator.clipboard.writeText(buildTrackingUrl(link.destination_url, link, link.ga4_id))
     setTrackingCopied(true)
     setTimeout(() => setTrackingCopied(false), 1500)
   }
@@ -216,7 +216,7 @@ export default function LinkDetail() {
               className="group/copy mono inline-flex max-w-full cursor-pointer items-center gap-1.5 truncate text-xs text-muted-foreground hover:text-ochre"
             >
               <span className="truncate">
-                {buildTrackingUrl(link.destination_url, link).replace('https://', '')}
+                {buildTrackingUrl(link.destination_url, link, link.ga4_id).replace('https://', '')}
               </span>
               {trackingCopied ? (
                 <Check className="size-3.5 shrink-0 text-success" />

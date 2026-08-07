@@ -178,6 +178,9 @@ export interface Link {
   utm_campaign: string | null
   utm_term: string | null
   utm_content: string | null
+  // Immutable GA4 campaign id ('wt-<id>'), stamped as utm_id at redirect. Surfaced
+  // so a copied tracking URL carries the same utm_id the redirect appends (#19).
+  ga4_id: string | null
   label: string | null
   link_type: string
   is_active: number

@@ -232,7 +232,7 @@ export default function BatchLinkForm() {
                       <Button
                         variant="ghost"
                         size="sm"
-                        onClick={() => copy(buildTrackingUrl(r.link!.destination_url, r.link!), `t-${r.key}`)}
+                        onClick={() => copy(buildTrackingUrl(r.link!.destination_url, r.link!, r.link!.ga4_id), `t-${r.key}`)}
                       >
                         {copiedKey === `t-${r.key}` ? (
                           <Check className="size-3.5 text-success" />

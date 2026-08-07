@@ -70,10 +70,16 @@ export interface UtmValues {
  * redirect handler in the Worker's index.ts), so it's the canonical "tracking
  * URL" — usable directly even without going through the short link.
  *
+ * When `ga4Id` is supplied it's appended as `utm_id` (the GA4 campaign id the
+ * redirect stamps as sessionCampaignId, #19) — but only if the destination
+ * doesn't already carry a utm_id, matching the redirect's rule that a
+ * customer-supplied utm_id wins. Pass a link's `ga4_id`; omit it for previews of
+ * links that don't exist yet (no id has been assigned).
+ *
  * Returns the raw destination unchanged if it isn't a parseable absolute URL, so
  * a half-typed destination in the batch form still previews something sensible.
  */
-export function buildTrackingUrl(destination: string, utm: UtmValues): string {
+export function buildTrackingUrl(destination: string, utm: UtmValues, ga4Id?: string | null): string {
   if (!destination) return ''
   let url: URL
   try {
@@ -92,6 +98,8 @@ export function buildTrackingUrl(destination: string, utm: UtmValues): string {
     const trimmed = value?.trim()
     if (trimmed) url.searchParams.set(key, trimmed)
   }
+  const ga4 = ga4Id?.trim()
+  if (ga4 && !url.searchParams.has('utm_id')) url.searchParams.set('utm_id', ga4)
   return url.toString()
 }
 

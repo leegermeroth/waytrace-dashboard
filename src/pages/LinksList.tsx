@@ -399,7 +399,7 @@ export default function LinksList() {
                         size="icon-sm"
                         title="Copy tracking URL"
                         aria-label="Copy tracking URL"
-                        onClick={() => copy(buildTrackingUrl(link.destination_url, link), `track-${link.id}`)}
+                        onClick={() => copy(buildTrackingUrl(link.destination_url, link, link.ga4_id), `track-${link.id}`)}
                       >
                         {copiedKey === `track-${link.id}` ? (
                           <Check className="size-3.5 text-success" />
