@@ -38,6 +38,13 @@ interface AuthState {
   subscriptionStatus: string | null
   role: Role | null
   /**
+   * The signed-in account's id (accounts row). Same for the owner and every
+   * invited user on the account, so browser-local QR style prefs and logos can
+   * be namespaced by account (#26) — one customer's branding never leaks into
+   * another's on a shared browser. Null until /me resolves.
+   */
+  accountId: number | null
+  /**
    * Platform Admin Console access (accounts.is_platform_admin). Persisted like
    * role so the Platform nav doesn't flash on reload; /me re-syncs it
    * authoritatively on mount. The Worker enforces the real gate.
@@ -96,6 +103,7 @@ const EMPTY_AUTH: AuthState = {
   subscriptionStatus: null,
   role: null,
   isPlatformAdmin: false,
+  accountId: null,
 }
 
 function loadStoredAuth(): AuthState {
@@ -110,6 +118,7 @@ function loadStoredAuth(): AuthState {
       subscriptionStatus: parsed.subscriptionStatus ?? null,
       role: parsed.role ?? null,
       isPlatformAdmin: parsed.isPlatformAdmin ?? false,
+      accountId: parsed.accountId ?? null,
     }
   } catch {
     return EMPTY_AUTH
@@ -162,6 +171,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         role: result.role ?? 'owner',
         // Auth responses don't carry the platform flag — /me syncs it on mount.
         isPlatformAdmin: false,
+        // /me fills this in on mount right after the token lands.
+        accountId: null,
       })
       return result
     },
@@ -177,6 +188,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       subscriptionStatus: result.subscription_status,
       role: 'owner',
       isPlatformAdmin: false,
+      // /me fills this in on mount right after the token lands.
+      accountId: null,
     })
   }, [persist])
 
@@ -189,6 +202,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       subscriptionStatus: result.subscription_status,
       role: 'owner',
       isPlatformAdmin: false,
+      // /me fills this in on mount right after the token lands.
+      accountId: null,
     })
   }, [persist])
 
@@ -201,6 +216,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       subscriptionStatus: result.subscription_status,
       role: 'owner',
       isPlatformAdmin: false,
+      // /me fills this in on mount right after the token lands.
+      accountId: null,
     })
   }, [persist])
 
@@ -213,6 +230,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       subscriptionStatus: result.subscription_status,
       role: result.role ?? 'contributor',
       isPlatformAdmin: false,
+      // /me fills this in on mount right after the token lands.
+      accountId: null,
     })
   }, [persist])
 
@@ -260,8 +279,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const isPlatformAdmin = me.is_platform_admin === 1
         setOnboardedAt(me.onboarded_at ?? null)
         setAuth((prev) => {
-          if (prev.role === role && prev.tier === me.tier && prev.isPlatformAdmin === isPlatformAdmin) return prev
-          const next = { ...prev, role, tier: me.tier, isPlatformAdmin }
+          if (
+            prev.role === role &&
+            prev.tier === me.tier &&
+            prev.isPlatformAdmin === isPlatformAdmin &&
+            prev.accountId === me.id
+          )
+            return prev
+          const next = { ...prev, role, tier: me.tier, isPlatformAdmin, accountId: me.id }
           localStorage.setItem(STORAGE_KEY, JSON.stringify(next))
           return next
         })

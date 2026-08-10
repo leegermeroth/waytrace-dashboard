@@ -191,6 +191,12 @@ export interface Link {
   client_name?: string
   client_slug?: string
   short_domain?: string | null
+  // Asset linkage (#29): non-null when this link is managed by a Packaging or
+  // Team Cards asset. The library uses it to label the link and route edits and
+  // deletes to the authoritative collection. NULL for ordinary standalone links.
+  collection_id?: number | null
+  collection_type?: 'product' | 'person' | null
+  collection_name?: string | null
 }
 
 export interface LinkInput {
@@ -355,6 +361,14 @@ export interface Me {
   // we tell an invited user apart from the account owner.
   user_id?: number
   role?: 'admin' | 'contributor'
+  // The true account owner's identity (#32). Always the accounts-row name/email,
+  // regardless of who is viewing — so the Team page renders the real owner once,
+  // even when an invited admin (whose own identity fills name/email) is looking.
+  owner_name?: string | null
+  owner_email?: string | null
+  // True only when THIS session is the account owner (not an invited user), so
+  // the Team page can mark "You" independently of the Owner badge.
+  is_owner?: boolean
   // Current cancellation state (#11), or null if the account has never cancelled.
   // Drives accurate Billing copy: grace-period retention, a failed refund needing
   // retry, or a scheduled period-end cancellation.
@@ -1081,13 +1095,19 @@ export async function bulkCreateAssets(
 
 /**
  * Edit an asset's typed fields (product or person, per its collection's type).
- * A SKU/slug change also re-stamps the link's ga4_id. destination_mode edits
- * ride this endpoint; an explicit '' clears an optional person field.
+ * destination_mode edits ride this endpoint; an explicit '' clears an optional
+ * person field. Session 16 (#30/#31): destination_url and is_active are edited
+ * atomically here too, so one save can never leave the asset and its link in
+ * disagreeing states — pass `destination_url: ''` to clear a vCard fallback.
  */
+export type AssetUpdateInput = (Partial<AssetRowInput> & Partial<PersonRowInput>) & {
+  is_active?: boolean
+}
+
 export function updateAsset(
   collectionId: number,
   assetId: number,
-  input: Partial<AssetRowInput> | Partial<PersonRowInput>
+  input: AssetUpdateInput
 ) {
   return request<CollectionAsset>(`/api/v1/collections/${collectionId}/assets/${assetId}`, {
     method: 'PUT',

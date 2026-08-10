@@ -2,16 +2,19 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import QRCodeStyling from 'qr-code-styling'
 import {
   buildQrOptions,
+  DEFAULT_STYLE,
   loadSavedStyle,
   LOGO_MAX_BYTES,
-  QR_STYLE_STORAGE_KEY,
+  persistStylePrefs,
+  saveLogo,
   SIZE_MAX,
   SIZE_MIN,
   SIZE_STEP,
   type CornerStyle,
   type DotStyle,
-  type SavedStyle,
 } from '@/lib/qr-style'
+import { checkScannability, LOGO_COVERAGE_WARN } from '@/lib/qr-scannability'
+import { useAuth } from '@/context/AuthContext'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -53,8 +56,10 @@ const CORNER_STYLES: { value: CornerStyle; label: string }[] = [
   { value: 'dots', label: 'Dots' },
 ]
 
-// Persisted style prefs (colors, pattern, corners, logo, size) are shared with
-// the bulk QR exporter — see src/lib/qr-style.ts for the storage contract.
+// Persisted style prefs (colors, pattern, corners, logo, size) are namespaced by
+// account and shared with the bulk QR exporter — see src/lib/qr-style.ts (#26).
+// The logo's on-canvas coverage (qr-code-styling imageSize) is fixed here.
+const LOGO_IMAGE_SIZE = 0.35
 
 function slugForFile(label: string | undefined, url: string): string {
   const base = (label || url).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '')
@@ -70,18 +75,42 @@ function slugForFile(label: string | undefined, url: string): string {
  * `?qr` scan-tracking URL), so scan tracking is unaffected. Controlled via `open`.
  */
 export function QrDialog({ open, onOpenChange, url, label }: Props) {
-  const initial = useRef<SavedStyle>(loadSavedStyle())
-  const [fgColor, setFgColor] = useState(initial.current.fgColor)
-  const [bgColor, setBgColor] = useState(initial.current.bgColor)
-  const [dotStyle, setDotStyle] = useState<DotStyle>(initial.current.dotStyle)
-  const [cornerStyle, setCornerStyle] = useState<CornerStyle>(initial.current.cornerStyle)
-  const [logo, setLogo] = useState<string | null>(initial.current.logo)
-  const [size, setSize] = useState<number>(initial.current.size)
+  const { accountId } = useAuth()
+  const [fgColor, setFgColor] = useState(DEFAULT_STYLE.fgColor)
+  const [bgColor, setBgColor] = useState(DEFAULT_STYLE.bgColor)
+  const [dotStyle, setDotStyle] = useState<DotStyle>(DEFAULT_STYLE.dotStyle)
+  const [cornerStyle, setCornerStyle] = useState<CornerStyle>(DEFAULT_STYLE.cornerStyle)
+  const [logo, setLogo] = useState<string | null>(DEFAULT_STYLE.logo)
+  const [size, setSize] = useState<number>(DEFAULT_STYLE.size)
   const [error, setError] = useState<string | null>(null)
+  // Persistence is gated until the account's saved style has loaded, so the
+  // initial DEFAULT render never clobbers stored prefs before we read them (#26).
+  const [hydrated, setHydrated] = useState(false)
 
   const containerRef = useRef<HTMLDivElement | null>(null)
   const qrRef = useRef<QRCodeStyling | null>(null)
   const fileInputRef = useRef<HTMLInputElement | null>(null)
+
+  // Load this account's saved style (prefs from localStorage, logo from
+  // IndexedDB). Re-runs on account switch so one customer's branding never
+  // carries into another's session on a shared browser.
+  useEffect(() => {
+    let cancelled = false
+    setHydrated(false)
+    loadSavedStyle(accountId).then((s) => {
+      if (cancelled) return
+      setFgColor(s.fgColor)
+      setBgColor(s.bgColor)
+      setDotStyle(s.dotStyle)
+      setCornerStyle(s.cornerStyle)
+      setLogo(s.logo)
+      setSize(s.size)
+      setHydrated(true)
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [accountId])
 
   // Base UI can mount the dialog's popup in a commit AFTER the open-effect has
   // already run (observed on the very first open of the dialog), leaving
@@ -119,17 +148,40 @@ export function QrDialog({ open, onOpenChange, url, label }: Props) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, url, fgColor, bgColor, dotStyle, cornerStyle, logo, size])
 
-  // Persist style choices (incl. the logo data URL) to localStorage.
+  // Persist the cheap style prefs (colors/pattern/corners/size) to the account's
+  // namespaced localStorage on every change — only after hydration.
   useEffect(() => {
-    try {
-      localStorage.setItem(
-        QR_STYLE_STORAGE_KEY,
-        JSON.stringify({ fgColor, bgColor, dotStyle, cornerStyle, logo, size } satisfies SavedStyle),
-      )
-    } catch {
-      // Quota exceeded (e.g. very large logo) — non-fatal, just don't persist.
-    }
-  }, [fgColor, bgColor, dotStyle, cornerStyle, logo, size])
+    if (!hydrated) return
+    persistStylePrefs(accountId, { fgColor, bgColor, dotStyle, cornerStyle, logo, size })
+  }, [hydrated, accountId, fgColor, bgColor, dotStyle, cornerStyle, logo, size])
+
+  // Persist the logo blob to IndexedDB only when it actually changes (large,
+  // async) — never on every color drag.
+  useEffect(() => {
+    if (!hydrated) return
+    void saveLogo(accountId, logo)
+  }, [hydrated, accountId, logo])
+
+  // Scannability guard (#27): warn — never block — about combinations that scan
+  // poorly, paired with a one-click reset to safe defaults below.
+  const warnings = checkScannability({
+    fgColor,
+    bgColor,
+    size,
+    hasLogo: logo != null,
+    logoCoverage: LOGO_IMAGE_SIZE > LOGO_COVERAGE_WARN ? LOGO_IMAGE_SIZE : 0,
+  })
+
+  function resetToDefaults() {
+    setError(null)
+    setFgColor(DEFAULT_STYLE.fgColor)
+    setBgColor(DEFAULT_STYLE.bgColor)
+    setDotStyle(DEFAULT_STYLE.dotStyle)
+    setCornerStyle(DEFAULT_STYLE.cornerStyle)
+    setSize(DEFAULT_STYLE.size)
+    // Leave the logo as-is — resetting is about restoring a scannable, high-
+    // contrast base, not discarding the customer's uploaded mark.
+  }
 
   function onLogoChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
@@ -168,6 +220,27 @@ export function QrDialog({ open, onOpenChange, url, label }: Props) {
         <div className="dot-grid-well mx-auto flex w-fit items-center justify-center rounded-md border border-border p-4 [&_canvas]:h-56 [&_canvas]:w-56">
           <div ref={attachContainer} className="flex items-center justify-center" />
         </div>
+
+        {warnings.length > 0 && (
+          <div className="flex flex-col gap-2 rounded-md border border-border bg-cast p-3">
+            {warnings.map((w) => (
+              <p
+                key={w.code}
+                className={w.level === 'critical' ? 'text-xs text-destructive' : 'text-xs text-muted-foreground'}
+              >
+                {w.level === 'critical' ? '⚠ ' : ''}
+                {w.message}
+              </p>
+            ))}
+            <button
+              type="button"
+              onClick={resetToDefaults}
+              className="mono w-fit cursor-pointer text-[0.625rem] tracking-[0.08em] text-ochre uppercase hover:underline"
+            >
+              Reset to safe defaults
+            </button>
+          </div>
+        )}
 
         <div className="grid grid-cols-2 gap-4">
           <div className="flex flex-col gap-2">

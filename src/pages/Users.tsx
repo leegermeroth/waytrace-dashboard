@@ -224,22 +224,30 @@ export default function Users() {
           </TableRow>
         </TableHeader>
         <TableBody>
-          {/* Owner row — read-only, pulled from /me since GET /users omits the owner. */}
+          {/* Owner row (#32) — always the TRUE account owner from /me's owner_*
+              fields, never whoever is viewing. "You" shows only when the current
+              session is the owner. The owner lives in `accounts`, so they never
+              appear in the /users list below — no duplication. */}
           {me && (
             <TableRow>
-              <TableCell className="font-medium">{me.name || '—'}</TableCell>
-              <TableCell className="mono text-xs text-muted-foreground">{me.email ?? '—'}</TableCell>
+              <TableCell className="font-medium">{me.owner_name || me.name || '—'}</TableCell>
+              <TableCell className="mono text-xs text-muted-foreground">
+                {me.owner_email ?? me.email ?? '—'}
+              </TableCell>
               <TableCell>
                 <Badge variant="ochre">Owner</Badge>
               </TableCell>
               <TableCell>
                 <StatusDot tone="success">Active</StatusDot>
               </TableCell>
-              <TableCell className="eyebrow-sm text-right">You</TableCell>
+              <TableCell className="eyebrow-sm text-right">{me.is_owner ? 'You' : ''}</TableCell>
             </TableRow>
           )}
 
-          {users.map((user) => (
+          {users.map((user) => {
+            // The current session is this invited user when /me carries their id.
+            const isSelf = me?.user_id != null && me.user_id === user.id
+            return (
             <TableRow key={user.id}>
               <TableCell className="font-medium">{user.name || '—'}</TableCell>
               <TableCell className="mono text-xs text-muted-foreground">{user.email}</TableCell>
@@ -248,7 +256,9 @@ export default function Users() {
                   value={user.role}
                   onValueChange={(v) => handleRoleChange(user, (v as 'admin' | 'contributor') ?? user.role)}
                 >
-                  <SelectTrigger className="w-40" disabled={busyId === user.id}>
+                  {/* You can't change your own role — it would risk locking
+                      yourself out of user management. */}
+                  <SelectTrigger className="w-40" disabled={busyId === user.id || isSelf}>
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -266,27 +276,34 @@ export default function Users() {
                 </div>
               </TableCell>
               <TableCell className="text-right">
-                <div className="flex justify-end gap-1">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    disabled={busyId === user.id}
-                    onClick={() => handleToggleActive(user)}
-                  >
-                    {user.is_active ? 'Disable' : 'Enable'}
-                  </Button>
-                  <Button
-                    variant="destructive-ghost"
-                    size="sm"
-                    disabled={busyId === user.id}
-                    onClick={() => handleRemove(user)}
-                  >
-                    Remove
-                  </Button>
-                </div>
+                {isSelf ? (
+                  // Your own row: labelled "You", with no self-disable / self-remove
+                  // footguns. Removing yourself is done by the account owner.
+                  <span className="eyebrow-sm text-muted-foreground">You</span>
+                ) : (
+                  <div className="flex justify-end gap-1">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      disabled={busyId === user.id}
+                      onClick={() => handleToggleActive(user)}
+                    >
+                      {user.is_active ? 'Disable' : 'Enable'}
+                    </Button>
+                    <Button
+                      variant="destructive-ghost"
+                      size="sm"
+                      disabled={busyId === user.id}
+                      onClick={() => handleRemove(user)}
+                    >
+                      Remove
+                    </Button>
+                  </div>
+                )}
               </TableCell>
             </TableRow>
-          ))}
+            )
+          })}
 
           {!isLoading && users.length === 0 && !me && (
             <TableRow>

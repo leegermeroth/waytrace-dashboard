@@ -1,6 +1,6 @@
 import JSZip from 'jszip'
 import QRCodeStyling from 'qr-code-styling'
-import { buildQrOptions, loadSavedStyle } from '@/lib/qr-style'
+import { buildQrOptions, loadSavedStyle, type SavedStyle } from '@/lib/qr-style'
 
 /**
  * Bulk QR export: one styled PNG per asset, zipped client-side. No server
@@ -51,7 +51,7 @@ export function sanitizeQrFilename(raw: string): string {
 }
 
 /** Render one QR to a PNG blob at the given style (headless — no DOM append). */
-async function renderPng(url: string, style: ReturnType<typeof loadSavedStyle>): Promise<Blob> {
+async function renderPng(url: string, style: SavedStyle): Promise<Blob> {
   const qr = new QRCodeStyling(buildQrOptions(url, style))
   const data = await qr.getRawData('png')
   if (!(data instanceof Blob)) throw new Error('QR rendering produced no image')
@@ -67,9 +67,12 @@ async function renderPng(url: string, style: ReturnType<typeof loadSavedStyle>):
 export async function exportQrZip(
   items: QrExportItem[],
   zipFilename: string,
+  accountId: number | null,
   onProgress?: (done: number, total: number) => void
 ): Promise<{ count: number; size: number }> {
-  const saved = loadSavedStyle()
+  // Account-scoped style (#26): the same namespaced prefs + IndexedDB logo the
+  // dialog uses, so a bulk export matches the per-row preview for this account.
+  const saved = await loadSavedStyle(accountId)
   const style = { ...saved, size: Math.max(saved.size, EXPORT_MIN_SIZE) }
 
   const zip = new JSZip()

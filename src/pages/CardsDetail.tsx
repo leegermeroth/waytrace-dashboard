@@ -8,7 +8,6 @@ import {
   getLinkHistory,
   renameCollection,
   updateAsset,
-  updateLink,
   BULK_ROW_CAP,
   VCARD_PLACEHOLDER_URL,
   type CollectionAsset,
@@ -540,9 +539,6 @@ function PersonEditDialog({
 
   const slugChanged = personSlug.trim() !== (asset.person_slug ?? '')
   const normalizedDest = destination.trim() ? normalizeDestinationUrl(destination) : ''
-  const storedDest = asset.destination_url === VCARD_PLACEHOLDER_URL ? '' : asset.destination_url
-  const destChanged = normalizedDest !== storedDest
-  const activeChanged = isActive !== (asset.is_active === 1)
   const needsDestination = mode === 'redirect' && !normalizedDest
 
   async function handleSave(e: FormEvent) {
@@ -550,22 +546,12 @@ function PersonEditDialog({
     setError(null)
     setIsSaving(true)
     try {
-      // Destination / active first via the links endpoint (history +
-      // validation) so a vcard→redirect switch already has its real
-      // destination in place when the mode lands on the asset.
-      if ((destChanged && normalizedDest) || activeChanged) {
-        await updateLink(asset.link_id, {
-          destination_url: normalizedDest || asset.destination_url,
-          is_active: isActive,
-          utm_source: asset.utm_source ?? undefined,
-          utm_medium: asset.utm_medium ?? undefined,
-          utm_campaign: asset.utm_campaign ?? undefined,
-          utm_term: asset.utm_term ?? undefined,
-          utm_content: asset.utm_content ?? undefined,
-          label: asset.label ?? undefined,
-        })
-      }
-      // Then the person fields + mode ('' clears an optional field).
+      // One atomic save (#30/#31): person fields, mode, destination (the vCard
+      // fallback), and the active flag commit together server-side — a valid save
+      // can never leave the card and its link disagreeing, and a vcard→redirect
+      // switch carries its new destination in the same request. An empty
+      // destination in vCard mode CLEARS the fallback (#31); '' on an optional
+      // person field clears it.
       await updateAsset(collectionId, asset.id, {
         person_name: personName.trim(),
         person_slug: personSlug.trim(),
@@ -573,6 +559,8 @@ function PersonEditDialog({
         email: email.trim(),
         phone: phone.trim(),
         destination_mode: mode,
+        destination_url: normalizedDest,
+        is_active: isActive,
       })
       onSaved()
     } catch (err) {

@@ -17,13 +17,6 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { PageHeader } from '@/components/brand'
 import BatchLinkForm from '@/pages/BatchLinkForm'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
 
 /**
  * Dispatcher: creating links uses the batch-first builder; editing an existing
@@ -146,20 +139,22 @@ function EditLinkForm({ id }: { id: string }) {
             )}
 
             {clients.length > 1 && (
+              // Workspace is read-only while editing (#28): the backend never
+              // moves a link between workspaces on update, so an editable
+              // selector here would silently no-op and read as data loss. To
+              // move a link, recreate it in the target workspace.
               <div className="flex flex-col gap-2">
                 <Label>Workspace</Label>
-                <Select value={clientId} onValueChange={(v) => setClientId(v ?? '')}>
-                  <SelectTrigger className="w-full">
-                    <SelectValue placeholder="Select a workspace" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {clients.map((c) => (
-                      <SelectItem key={c.id} value={String(c.id)}>
-                        {c.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <Input
+                  value={clients.find((c) => String(c.id) === clientId)?.name ?? '—'}
+                  readOnly
+                  disabled
+                  aria-describedby="workspace_note"
+                />
+                <p id="workspace_note" className="text-xs text-muted-foreground">
+                  A link stays in the workspace it was created in. To move it, create a new link in the
+                  other workspace and deactivate this one.
+                </p>
               </div>
             )}
 

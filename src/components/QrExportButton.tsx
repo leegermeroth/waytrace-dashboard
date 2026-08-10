@@ -3,6 +3,7 @@ import { FolderDown } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import type { CollectionAsset } from '@/lib/api'
 import { scanUrl } from '@/lib/links'
+import { useAuth } from '@/context/AuthContext'
 
 interface Props {
   /** Assets to export — one QR per asset, encoding its ?qr=1 scan URL. */
@@ -23,6 +24,7 @@ interface Props {
  * not gated on canAdminister — contributors can pull print files too.
  */
 export function QrExportButton({ assets, nameFor, zipName, onError }: Props) {
+  const { accountId } = useAuth()
   const [progress, setProgress] = useState<{ done: number; total: number } | null>(null)
   // Guards double-clicks across the async import gap before state updates.
   const busyRef = useRef(false)
@@ -36,6 +38,7 @@ export function QrExportButton({ assets, nameFor, zipName, onError }: Props) {
       await exportQrZip(
         assets.map((a) => ({ url: scanUrl(a), name: nameFor(a) || a.short_code })),
         zipName,
+        accountId,
         (done, total) => setProgress({ done, total })
       )
     } catch (err) {

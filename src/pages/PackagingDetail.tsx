@@ -10,7 +10,6 @@ import {
   listClients,
   renameCollection,
   updateAsset,
-  updateLink,
   BULK_ROW_CAP,
   type CollectionAsset,
   type CollectionDetail,
@@ -519,33 +518,23 @@ function AssetEditDialog({
   }, [asset.link_id])
 
   const skuChanged = sku.trim() !== (asset.sku ?? '')
-  const destChanged = normalizeDestinationUrl(destination) !== asset.destination_url
 
   async function handleSave(e: FormEvent) {
     e.preventDefault()
     setError(null)
     setIsSaving(true)
     try {
-      // Asset fields first (SKU edit re-stamps ga4_id)…
+      // One atomic save (#30): the SKU fields AND the destination commit together
+      // server-side (with destination history), so a valid save can never leave
+      // the SKU row and its link disagreeing. Destination is always sent — the
+      // Worker no-ops it when unchanged.
       await updateAsset(collectionId, asset.id, {
         sku: sku.trim(),
         product_name: productName.trim(),
         variant: variant.trim() || undefined,
         upc: upc.trim() || undefined,
+        destination_url: normalizeDestinationUrl(destination),
       })
-      // …then the destination via the links endpoint (history + validation),
-      // preserving the link's stored UTMs.
-      if (destChanged) {
-        await updateLink(asset.link_id, {
-          destination_url: normalizeDestinationUrl(destination),
-          utm_source: asset.utm_source ?? undefined,
-          utm_medium: asset.utm_medium ?? undefined,
-          utm_campaign: asset.utm_campaign ?? undefined,
-          utm_term: asset.utm_term ?? undefined,
-          utm_content: asset.utm_content ?? undefined,
-          label: asset.label ?? undefined,
-        })
-      }
       onSaved()
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to save changes')

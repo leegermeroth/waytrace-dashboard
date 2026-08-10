@@ -4,6 +4,7 @@ import { Check, Copy, QrCode as QrIcon, Search, X } from 'lucide-react'
 import { deleteLink, listClients, listLinks, type Client, type Link } from '@/lib/api'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { Badge } from '@/components/ui/badge'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { PageHeader, StatusDot } from '@/components/brand'
 import { QrDialog } from '@/components/QrDialog'
@@ -20,6 +21,19 @@ import { FilterSelect } from '@/components/FilterSelect'
 
 type SortKey = 'label' | 'clicks' | 'scans' | 'created_at'
 type StatusFilter = 'all' | 'active' | 'inactive'
+
+/**
+ * Asset-managed links (#29): a Packaging SKU or Team Card owns its link, and the
+ * authoritative place to edit or delete it is its collection — deleting it from
+ * the general library also removes the SKU/card. Returns the collection's label,
+ * its detail route, and the noun for warnings, or null for an ordinary link.
+ */
+function assetMeta(link: Link): { label: string; route: string; noun: string } | null {
+  if (!link.collection_id || !link.collection_type) return null
+  return link.collection_type === 'person'
+    ? { label: 'Team Card', route: `/dashboard/cards/${link.collection_id}`, noun: 'card' }
+    : { label: 'Packaging', route: `/dashboard/packaging/${link.collection_id}`, noun: 'SKU' }
+}
 
 /** A quiet toggle chip for the boolean quick-filters. */
 function FilterChip({
@@ -186,7 +200,11 @@ export default function LinksList() {
   }
 
   async function handleDelete(link: Link) {
-    if (!confirm(`Delete "${link.label || link.short_code}"? This cannot be undone.`)) return
+    const asset = assetMeta(link)
+    const message = asset
+      ? `Delete "${link.label || link.short_code}"? This link is managed by ${asset.label} — deleting it also removes its ${asset.noun} from that collection, and its short link (printed QR codes and NFC chips) stops resolving immediately. This cannot be undone.`
+      : `Delete "${link.label || link.short_code}"? This cannot be undone.`
+    if (!confirm(message)) return
     try {
       await deleteLink(link.id)
       setLinks((prev) => prev.filter((l) => l.id !== link.id))
@@ -338,12 +356,24 @@ export default function LinksList() {
               {filtered.map((link) => (
                 <TableRow key={link.id}>
                   <TableCell>
-                    <RouterLink
-                      to={`/dashboard/links/${link.id}`}
-                      className="font-medium hover:text-ochre"
-                    >
-                      {link.label || link.short_code}
-                    </RouterLink>
+                    <div className="flex items-center gap-2">
+                      <RouterLink
+                        to={`/dashboard/links/${link.id}`}
+                        className="font-medium hover:text-ochre"
+                      >
+                        {link.label || link.short_code}
+                      </RouterLink>
+                      {(() => {
+                        const asset = assetMeta(link)
+                        return asset ? (
+                          <RouterLink to={asset.route} title={`Managed in ${asset.label} — edit there`}>
+                            <Badge variant="outline" className="cursor-pointer hover:text-ochre">
+                              {asset.label}
+                            </Badge>
+                          </RouterLink>
+                        ) : null
+                      })()}
+                    </div>
                   </TableCell>
                   <TableCell>
                     <button
@@ -419,10 +449,13 @@ export default function LinksList() {
                       >
                         <QrIcon className="size-3.5" />
                       </Button>
+                      {/* Asset-managed links edit in their collection, where the
+                          authoritative SKU/card fields live (#29); ordinary links
+                          use the generic editor. */}
                       <Button
                         variant="ghost"
                         size="sm"
-                        render={<RouterLink to={`/dashboard/links/${link.id}/edit`} />}
+                        render={<RouterLink to={assetMeta(link)?.route ?? `/dashboard/links/${link.id}/edit`} />}
                       >
                         Edit
                       </Button>
