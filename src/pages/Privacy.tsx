@@ -8,7 +8,7 @@ export default function Privacy() {
       </p>
 
       <h1 className="text-2xl font-semibold mb-1">Privacy Policy</h1>
-      <p className="text-muted-foreground mb-8">Effective date: July 15, 2026</p>
+      <p className="text-muted-foreground mb-8">Effective date: August 21, 2026</p>
 
       <p className="mb-6">
         This Privacy Policy explains how Germeroth Consulting &amp; Creative ("we," "us," or
@@ -32,10 +32,14 @@ export default function Privacy() {
           labels you create in Waytrace.
         </li>
         <li>
-          <strong>Click and scan data</strong> — when someone clicks a short link or scans a QR
-          code managed by Waytrace, we log the timestamp, approximate country, device type,
-          referrer, and whether the interaction was a link click or QR scan. We do not store IP
-          addresses.
+          <strong>Click and scan data</strong> — when someone clicks a short link, scans a QR
+          code, or taps an NFC tag managed by Waytrace, we log the timestamp, approximate location,
+          device type, referrer, and the interaction type (link click, QR scan, or NFC tap). The
+          approximate location includes country, region, and city — and the city's approximate
+          postal code and map coordinates — derived at the network level from the visitor's
+          connection (via Cloudflare). This is an estimate at roughly the city level, not a precise
+          position, and can be inaccurate for VPN, corporate, or mobile traffic. We do not store
+          visitor IP addresses in our tracking records.
         </li>
         <li>
           <strong>Google Analytics data</strong> — if you connect the optional Google Analytics
@@ -127,8 +131,15 @@ export default function Privacy() {
         <Link to="/terms" className="underline">Terms of Service</Link>). If you cancel after 14
         days or are on the free tier, your data is retained but you may request full deletion at
         any time by emailing{' '}
-        <a href="mailto:hello@waytrace.co" className="underline">hello@waytrace.co</a>. Click/scan
-        analytics are retained for up to 24 months.
+        <a href="mailto:hello@waytrace.co" className="underline">hello@waytrace.co</a>.
+      </p>
+      <p className="mb-4">
+        Detailed click, scan, and tap records — including the timestamp and the approximate-location
+        and device details described in Section 1 — are retained for up to 24 months, after which
+        they are automatically deleted on a rolling basis. Aggregate totals, such as the lifetime
+        click and scan counts for each link, are kept for as long as the link exists and are not
+        affected by this 24-month window. You can export your link data to CSV at any time to keep a
+        permanent copy of your analytics.
       </p>
 
       <h2 className="font-semibold mt-8 mb-2">6. Security</h2>
