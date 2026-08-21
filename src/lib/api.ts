@@ -218,6 +218,8 @@ export interface LinkStats {
   clicksByDay: { day: string; count: number }[]
   byCountry: { country: string; count: number }[]
   byDevice: { device_type: string; count: number }[]
+  byCity: { city: string; region: string | null; country: string; latitude: number | null; longitude: number | null; count: number }[]
+  byRegion: { region: string; country: string; count: number }[]
 }
 
 export function listClients() {

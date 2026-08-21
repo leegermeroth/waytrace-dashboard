@@ -36,10 +36,13 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { PageHeader, StatCard } from '@/components/brand'
 import { QrDialog } from '@/components/QrDialog'
+import { ClickMap } from '@/components/ClickMap'
+import { InfoHint } from '@/components/InfoHint'
 import {
   Table,
   TableBody,
   TableCell,
+  TableFooter,
   TableHead,
   TableHeader,
   TableRow,
@@ -298,23 +301,121 @@ export default function LinkDetail() {
 
       <VariantsPanel linkId={link.id} />
 
+      <Card>
+        <CardHeader>
+          <CardTitle>UTM parameters</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {utmParams.length > 0 ? (
+            <ul className="flex flex-col text-sm">
+              {utmParams.map(([key, value]) => (
+                <li key={key} className="flex items-center justify-between gap-4 border-b border-border py-2 last:border-0">
+                  <span className="eyebrow-sm">{key}</span>
+                  <span className="mono truncate text-foreground">{value}</span>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="font-serif text-sm text-muted-foreground italic">No UTM parameters set.</p>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-1.5">
+            Clicks map
+            <InfoHint text="Bubbles mark the approximate city each click came from, sized by volume. Location is estimated from the visitor's network (via Cloudflare), so it's accurate to roughly the city — not a precise position — and can be off for VPN or mobile traffic." />
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <ClickMap cities={stats?.byCity ?? []} />
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-1.5">
+            Locations
+            <InfoHint text="Cities ranked by click volume. Location is estimated from the visitor's network (via Cloudflare) and is approximate — often the ISP's regional hub rather than the exact town. Country is highly reliable; city and region are best-effort." />
+          </CardTitle>
+          <CardDescription>Where clicks came from, resolved to approximate city level.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          {stats && stats.byCity && stats.byCity.length > 0 ? (
+            (() => {
+              const total = stats.byCity.reduce((sum, r) => sum + r.count, 0)
+              return (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>City</TableHead>
+                      <TableHead>Region</TableHead>
+                      <TableHead>Country</TableHead>
+                      <TableHead className="text-right">Clicks</TableHead>
+                      <TableHead className="text-right">Share</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {stats.byCity.map((row) => (
+                      <TableRow key={`${row.city}|${row.region ?? ''}|${row.country}`}>
+                        <TableCell className="font-medium text-foreground">{row.city}</TableCell>
+                        <TableCell className="text-muted-foreground">{row.region || '—'}</TableCell>
+                        <TableCell className="mono text-muted-foreground">
+                          {row.country && row.country !== 'Unknown' ? row.country : '—'}
+                        </TableCell>
+                        <TableCell className="mono text-right text-foreground">{row.count}</TableCell>
+                        <TableCell className="mono text-right text-muted-foreground">
+                          {total > 0 ? `${((row.count / total) * 100).toFixed(1)}%` : '—'}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                  <TableFooter>
+                    <TableRow>
+                      <TableCell className="eyebrow-sm" colSpan={3}>Total</TableCell>
+                      <TableCell className="mono text-right text-foreground">{total}</TableCell>
+                      <TableCell className="mono text-right text-muted-foreground">100%</TableCell>
+                    </TableRow>
+                  </TableFooter>
+                </Table>
+              )
+            })()
+          ) : (
+            <p className="font-serif text-sm text-muted-foreground italic">
+              No location data yet. City-level location is recorded from the moment this feature went
+              live, so older clicks show country only.
+            </p>
+          )}
+        </CardContent>
+      </Card>
+
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <Card>
           <CardHeader>
-            <CardTitle>UTM parameters</CardTitle>
+            <CardTitle className="flex items-center gap-1.5">
+              Clicks by region
+              <InfoHint text="Region (state/province) totals, estimated from the visitor's network (via Cloudflare) and approximate. Country is highly reliable; region is best-effort." />
+            </CardTitle>
           </CardHeader>
           <CardContent>
-            {utmParams.length > 0 ? (
+            {stats && stats.byRegion && stats.byRegion.length > 0 ? (
               <ul className="flex flex-col text-sm">
-                {utmParams.map(([key, value]) => (
-                  <li key={key} className="flex items-center justify-between gap-4 border-b border-border py-2 last:border-0">
-                    <span className="eyebrow-sm">{key}</span>
-                    <span className="mono truncate text-foreground">{value}</span>
+                {stats.byRegion.map((row) => (
+                  <li
+                    key={`${row.region}|${row.country}`}
+                    className="flex items-center justify-between gap-4 border-b border-border py-2 last:border-0"
+                  >
+                    <span className="mono text-muted-foreground truncate">
+                      {row.region}
+                      {row.country && row.country !== 'Unknown' ? ` · ${row.country}` : ''}
+                    </span>
+                    <span className="mono text-foreground">{row.count}</span>
                   </li>
                 ))}
               </ul>
             ) : (
-              <p className="font-serif text-sm text-muted-foreground italic">No UTM parameters set.</p>
+              <p className="font-serif text-sm text-muted-foreground italic">No region data yet.</p>
             )}
           </CardContent>
         </Card>
