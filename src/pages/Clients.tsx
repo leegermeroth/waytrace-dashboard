@@ -19,6 +19,7 @@ import { Label } from '@/components/ui/label'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { PageHeader, StatusDot } from '@/components/brand'
 import { TrackingFoundation } from '@/components/TrackingFoundation'
+import { slugify } from '@/lib/links'
 import {
   deriveFoundation,
   emptyFoundation,
@@ -62,6 +63,28 @@ interface ClientFormState {
 }
 
 const emptyForm: ClientFormState = { id: null, name: '', slug: '', linkDomain: SHARED_DEFAULT }
+
+// The workspace slug is a non-user-facing unique identifier (never appears in a
+// short link or any URL), so we auto-derive it from the name instead of asking.
+// Slugs are globally unique in the schema, so on a collision we append -2, -3, …
+// and retry; a timestamp suffix is the last-resort fallback.
+async function createClientWithAutoSlug(
+  name: string,
+  linkDomain: string | null
+): Promise<Client> {
+  const base = slugify(name) || 'workspace'
+  for (let attempt = 0; attempt < 8; attempt++) {
+    const slug = attempt === 0 ? base : `${base}-${attempt + 1}`
+    try {
+      return await createClient(name, slug, undefined, linkDomain)
+    } catch (err) {
+      const message = err instanceof Error ? err.message : ''
+      if (/slug already exists/i.test(message)) continue
+      throw err
+    }
+  }
+  return createClient(name, `${base}-${Date.now().toString(36)}`, undefined, linkDomain)
+}
 
 export default function Clients() {
   const { tier } = useAuth()
@@ -161,7 +184,7 @@ export default function Clients() {
       } else {
         const copySource = copyEnabled ? clients.find((c) => c.id === copyFromId) ?? null : null
 
-        const created = await createClient(form.name, form.slug, undefined, linkDomain)
+        const created = await createClientWithAutoSlug(form.name, linkDomain)
         setDialogOpen(false)
         refresh()
 
@@ -264,7 +287,6 @@ export default function Clients() {
           <TableHeader>
             <TableRow>
               <TableHead>Name</TableHead>
-              <TableHead>Slug</TableHead>
               <TableHead>New-link domain</TableHead>
               <TableHead>Status</TableHead>
               <TableHead className="text-right">Actions</TableHead>
@@ -274,7 +296,6 @@ export default function Clients() {
             {clients.map((client) => (
               <TableRow key={client.id}>
                 <TableCell className="font-medium">{client.name}</TableCell>
-                <TableCell className="mono text-xs text-muted-foreground">{client.slug}</TableCell>
                 <TableCell className="mono text-xs text-muted-foreground">
                   {client.link_domain || 'waygo.to'}
                 </TableCell>
@@ -327,16 +348,6 @@ export default function Clients() {
               />
             </div>
             <div className="flex flex-col gap-2">
-              <Label htmlFor="client_slug">Slug</Label>
-              <Input
-                id="client_slug"
-                required
-                value={form.slug}
-                onChange={(e) => setForm((f) => ({ ...f, slug: e.target.value.toLowerCase() }))}
-                placeholder="lowercase-with-hyphens"
-              />
-            </div>
-            <div className="flex flex-col gap-2">
               <Label htmlFor="client_domain">Domain for new links</Label>
               <Select
                 value={form.linkDomain}
@@ -378,7 +389,11 @@ export default function Clients() {
                     onValueChange={(v) => setCopyFromId(Number(v))}
                   >
                     <SelectTrigger className="w-full">
-                      <SelectValue placeholder="Choose a workspace" />
+                      <SelectValue placeholder="Choose a workspace">
+                        {(value: string) =>
+                          clients.find((c) => String(c.id) === value)?.name ?? 'Choose a workspace'
+                        }
+                      </SelectValue>
                     </SelectTrigger>
                     <SelectContent>
                       {clients.map((c) => (

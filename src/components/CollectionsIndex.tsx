@@ -215,7 +215,11 @@ export function CollectionsIndex({
                 <Label htmlFor="col_client">Workspace</Label>
                 <Select value={clientId} onValueChange={(v) => setClientId(v ?? '')}>
                   <SelectTrigger id="col_client" className="w-full">
-                    <SelectValue placeholder="Select a workspace" />
+                    <SelectValue placeholder="Select a workspace">
+                      {(value: string) =>
+                        clients.find((c) => String(c.id) === value)?.name ?? 'Select a workspace'
+                      }
+                    </SelectValue>
                   </SelectTrigger>
                   <SelectContent>
                     {clients.map((c) => (

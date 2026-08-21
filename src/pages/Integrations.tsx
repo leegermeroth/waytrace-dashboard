@@ -395,7 +395,22 @@ export default function Integrations() {
                       onValueChange={(v) => handleMap(c.id, v ?? NONE)}
                     >
                       <SelectTrigger className="h-8 w-auto min-w-56">
-                        <SelectValue placeholder="No GA4 property" />
+                        {/* Base UI renders the raw value string by default, which
+                            for GA4 mappings is "connId::properties/123". Format it
+                            back to the human-readable property name. */}
+                        <SelectValue placeholder="No GA4 property">
+                          {(value: string) => {
+                            if (!value || value === NONE) return 'No GA4 property'
+                            const [connIdRaw, propId] = value.split('::')
+                            const p = properties.find(
+                              (x) => x.connection_id === Number(connIdRaw) && x.property_id === propId
+                            )
+                            // Fall back to the name stored on the workspace when the
+                            // property list can't be loaded (e.g. a reconnect-needed
+                            // account), so a mapped workspace never reads as unmapped.
+                            return p?.property_name || c.ga4_property_name || 'No GA4 property'
+                          }}
+                        </SelectValue>
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value={NONE}>No GA4 property</SelectItem>

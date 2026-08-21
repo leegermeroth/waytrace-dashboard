@@ -105,7 +105,7 @@ function BreakdownCard({
                   <span className="mono shrink-0 text-xs text-muted-foreground">
                     {r.total.toLocaleString()}
                     {g && g.sessions > 0 && (
-                      <span className="text-ochre"> · {g.sessions.toLocaleString()} sess</span>
+                      <span className="text-ochre"> · {g.sessions.toLocaleString()} session{g.sessions === 1 ? '' : 's'}</span>
                     )}
                   </span>
                 </div>
@@ -268,7 +268,9 @@ export default function Analytics() {
 
         <Select value={range} onValueChange={(v) => setRange(v ?? '30')}>
           <SelectTrigger className="h-8 w-auto min-w-36">
-            <SelectValue placeholder="Last 30 days" />
+            <SelectValue placeholder="Last 30 days">
+              {(value: string) => RANGES.find((r) => r.value === value)?.label ?? 'Last 30 days'}
+            </SelectValue>
           </SelectTrigger>
           <SelectContent>
             {RANGES.map((r) => (

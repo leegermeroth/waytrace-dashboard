@@ -44,7 +44,10 @@ interface RowResult {
 
 let rowSeq = 0
 function emptyRow(overrides: Partial<Row> = {}): Row {
-  return { key: rowSeq++, source: '', medium: '', content: '', destination: '', label: '', shortCode: '', ...overrides }
+  // `key` goes last so it always wins: duplicateRow passes an existing row
+  // (including its key) as overrides, and we must give the copy a fresh key —
+  // otherwise both rows share a key and edit/remove hit both at once.
+  return { source: '', medium: '', content: '', destination: '', label: '', shortCode: '', ...overrides, key: rowSeq++ }
 }
 
 // Fire a few creates at a time — enough to feel instant on a normal batch,
@@ -310,7 +313,11 @@ export default function BatchLinkForm() {
               <Label>Workspace</Label>
               <Select value={clientId} onValueChange={(v) => setClientId(v ?? '')}>
                 <SelectTrigger className="w-full">
-                  <SelectValue placeholder="Select a workspace" />
+                  <SelectValue placeholder="Select a workspace">
+                    {(value: string) =>
+                      clients.find((c) => String(c.id) === value)?.name ?? 'Select a workspace'
+                    }
+                  </SelectValue>
                 </SelectTrigger>
                 <SelectContent>
                   {clients.map((c) => (

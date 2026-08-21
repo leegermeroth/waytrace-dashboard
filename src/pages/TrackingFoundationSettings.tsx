@@ -182,7 +182,11 @@ export default function TrackingFoundationSettings() {
                 onValueChange={(v) => handleSelectWorkspace(Number(v))}
               >
                 <SelectTrigger className="w-64">
-                  <SelectValue placeholder="Choose a workspace" />
+                  <SelectValue placeholder="Choose a workspace">
+                    {(value: string) =>
+                      clients.find((c) => String(c.id) === value)?.name ?? 'Choose a workspace'
+                    }
+                  </SelectValue>
                 </SelectTrigger>
                 <SelectContent>
                   {clients.map((c) => (
