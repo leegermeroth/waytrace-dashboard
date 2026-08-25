@@ -30,9 +30,18 @@ const parts = [];
 const addPolygon = (polygon) => {
   // polygon = [outerRing, ...holes]
   for (const ring of polygon) {
+    // Split the ring at antimeridian crossings. Landmasses that straddle ±180°
+    // longitude (Fiji ~17°S, Russia's Chukotka/Wrangel ~70°N, Antarctica) have a
+    // consecutive point pair that jumps the full width of the map; drawing a line
+    // across that jump paints a full-width horizontal stripe. Starting a fresh
+    // subpath (moveto) at the jump avoids it — each side of the antimeridian is
+    // filled as its own piece near the correct edge.
     let d = '';
-    ring.forEach(([lon, lat], i) => {
-      d += (i === 0 ? 'M' : 'L') + px(lon) + ' ' + py(lat);
+    let prevLon = null;
+    ring.forEach(([lon, lat]) => {
+      const cmd = prevLon === null || Math.abs(lon - prevLon) > 180 ? 'M' : 'L';
+      d += cmd + px(lon) + ' ' + py(lat);
+      prevLon = lon;
     });
     parts.push(d + 'Z');
   }

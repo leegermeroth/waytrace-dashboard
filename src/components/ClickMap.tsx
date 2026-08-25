@@ -37,16 +37,39 @@ const WORLD_BOX: Box = { x: 0, y: 0, w: WORLD_MAP_WIDTH, h: WORLD_MAP_HEIGHT }
 const TARGET_ASPECT = WORLD_MAP_WIDTH / WORLD_MAP_HEIGHT // 2:1, so the frame keeps the world's shape
 
 /**
- * Fit a viewBox around the plotted points: tight bounding box, generous padding,
- * a minimum extent so one city doesn't zoom to the rooftops, normalized to the
- * world's 2:1 aspect, and clamped inside the map. If clicks cluster in one region
- * (e.g. all US), the map shows that region instead of the whole globe.
+ * Fit a viewBox around the plotted points so the map frames where the clicks
+ * actually are — e.g. a mostly-US audience shows the US, not the whole globe.
+ *
+ * A handful of far-flung clicks (a lone visit from another continent) would
+ * otherwise blow the frame out to the whole world, so we first drop the farthest
+ * points that together account for only a small share of total click VOLUME, then
+ * fit to what remains. Every point is still drawn as a bubble and listed in the
+ * Locations table; this only decides the default framing, and "Whole world"
+ * always shows everything.
  */
 function fitBox(points: Point[]): Box {
   if (points.length === 0) return WORLD_BOX
 
+  // Volume-weighted centroid, then drop the farthest points whose combined
+  // clicks are within a small trim budget (keep ~90% of click volume).
+  const total = points.reduce((s, p) => s + p.count, 0)
+  const meanX = points.reduce((s, p) => s + p.cx * p.count, 0) / total
+  const meanY = points.reduce((s, p) => s + p.cy * p.count, 0) / total
+  const byFarthest = [...points].sort(
+    (a, b) => Math.hypot(b.cx - meanX, b.cy - meanY) - Math.hypot(a.cx - meanX, a.cy - meanY)
+  )
+  const trimBudget = total * 0.1
+  let trimmed = 0
+  const kept: Point[] = []
+  for (const p of byFarthest) {
+    // Peel the farthest points while the budget allows; once one doesn't fit,
+    // keep it and every (nearer) point after it. Never trim the last point.
+    if (trimmed + p.count <= trimBudget && kept.length < points.length - 1) trimmed += p.count
+    else kept.push(p)
+  }
+
   let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity
-  for (const p of points) {
+  for (const p of kept) {
     minX = Math.min(minX, p.cx)
     minY = Math.min(minY, p.cy)
     maxX = Math.max(maxX, p.cx)
@@ -55,14 +78,14 @@ function fitBox(points: Point[]): Box {
 
   let w = maxX - minX
   let h = maxY - minY
-  let cx = (minX + maxX) / 2
-  let cy = (minY + maxY) / 2
+  const cx = (minX + maxX) / 2
+  const cy = (minY + maxY) / 2
 
-  // Padding: 45% of the span, with an absolute floor so a single point (span 0)
-  // still opens up to a readable window.
-  const MIN_W = 150 // world units (~54° of longitude)
-  w = Math.max(w * 1.9, MIN_W)
-  h = Math.max(h * 1.9, MIN_W / TARGET_ASPECT)
+  // Light padding around the cluster, with an absolute floor so a single city
+  // still opens up to a readable window instead of zooming to the rooftops.
+  const MIN_W = 120 // world units (~43° of longitude)
+  w = Math.max(w * 1.3, MIN_W)
+  h = Math.max(h * 1.3, MIN_W / TARGET_ASPECT)
 
   // Normalize to the world's aspect ratio so the frame isn't stretched.
   if (w / h > TARGET_ASPECT) h = w / TARGET_ASPECT
@@ -146,46 +169,58 @@ export function ClickMap({ cities }: { cities: ClickMapCity[] }) {
 
   return (
     <div className="flex flex-col gap-3">
-      <div className="relative w-full overflow-hidden rounded-lg border border-border bg-muted/40">
-        <svg
-          viewBox={`${box.x} ${box.y} ${box.w} ${box.h}`}
-          className="block h-auto w-full"
-          role="img"
-          aria-label="Map of clicks by city"
-          onMouseLeave={() => setHover(null)}
-        >
-          <path d={WORLD_MAP_PATH} fill="var(--border)" fillOpacity={0.55} stroke="none" />
-          {drawOrder.map((p) => (
-            <circle
-              key={p.key}
-              cx={p.cx}
-              cy={p.cy}
-              r={radius(p.count)}
-              fill="var(--chart-1)"
-              fillOpacity={hover?.key === p.key ? 0.85 : 0.5}
-              stroke="var(--card)"
-              strokeWidth={strokeW}
-              className="cursor-pointer transition-[fill-opacity]"
-              onMouseEnter={() => setHover(p)}
-            />
-          ))}
-        </svg>
-
-        {hover && (
-          <div
-            className="pointer-events-none absolute z-10 -translate-x-1/2 -translate-y-full rounded-md bg-popover px-2.5 py-1.5 text-xs whitespace-nowrap text-popover-foreground shadow-md ring-1 ring-foreground/10"
-            style={{
-              left: `${((hover.cx - box.x) / box.w) * 100}%`,
-              top: `calc(${((hover.cy - box.y) / box.h) * 100}% - 8px)`,
-            }}
+      {/* The positioning context is NOT overflow-clipped, so the hover tooltip can
+          extend past the map edges. Only the inner wrapper clips the basemap to
+          rounded corners. */}
+      <div className="relative w-full">
+        <div className="overflow-hidden rounded-lg border border-border bg-muted/40">
+          <svg
+            viewBox={`${box.x} ${box.y} ${box.w} ${box.h}`}
+            className="block h-auto w-full"
+            role="img"
+            aria-label="Map of clicks by city"
+            onMouseLeave={() => setHover(null)}
           >
-            <span className="mono text-foreground">{hover.label}</span>
-            <span className="mono text-muted-foreground">
-              {" — "}
-              {hover.count} {hover.count === 1 ? "click" : "clicks"}
-            </span>
-          </div>
-        )}
+            <path d={WORLD_MAP_PATH} fill="var(--border)" fillOpacity={0.55} stroke="none" />
+            {drawOrder.map((p) => (
+              <circle
+                key={p.key}
+                cx={p.cx}
+                cy={p.cy}
+                r={radius(p.count)}
+                fill="var(--chart-1)"
+                fillOpacity={hover?.key === p.key ? 0.85 : 0.5}
+                stroke="var(--card)"
+                strokeWidth={strokeW}
+                className="cursor-pointer transition-[fill-opacity]"
+                onMouseEnter={() => setHover(p)}
+              />
+            ))}
+          </svg>
+        </div>
+
+        {hover && (() => {
+          const leftPct = ((hover.cx - box.x) / box.w) * 100
+          const topPct = ((hover.cy - box.y) / box.h) * 100
+          // Flip below the point for bubbles near the top edge so the tooltip
+          // isn't cut off by the card above.
+          const below = topPct < 20
+          return (
+            <div
+              className={`pointer-events-none absolute z-10 -translate-x-1/2 rounded-md bg-popover px-2.5 py-1.5 text-xs whitespace-nowrap text-popover-foreground shadow-md ring-1 ring-foreground/10 ${below ? "" : "-translate-y-full"}`}
+              style={{
+                left: `${Math.max(6, Math.min(94, leftPct))}%`,
+                top: `calc(${topPct}% ${below ? "+" : "-"} 10px)`,
+              }}
+            >
+              <span className="mono text-foreground">{hover.label}</span>
+              <span className="mono text-muted-foreground">
+                {" — "}
+                {hover.count} {hover.count === 1 ? "click" : "clicks"}
+              </span>
+            </div>
+          )
+        })()}
 
         {canFit && (
           <button
