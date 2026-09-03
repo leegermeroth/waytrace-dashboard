@@ -54,6 +54,22 @@ function emptyRow(overrides: Partial<Row> = {}): Row {
 // gentle enough not to hammer the Worker. Partial success is reported per row.
 const CONCURRENCY = 4
 
+// The parameter pairs shown under each created link, so duplicated rows (which
+// share a title of label-or-short-code) can be told apart at a glance. Mirrors
+// the columns in the main links list; only non-empty values are shown.
+function paramEntries(link: Link): { label: string; value: string }[] {
+  return (
+    [
+      ['Source', link.utm_source],
+      ['Medium', link.utm_medium],
+      ['Campaign', link.utm_campaign],
+      ['Content', link.utm_content],
+    ] as const
+  )
+    .map(([label, value]) => ({ label, value: value?.trim() || '' }))
+    .filter((e) => e.value)
+}
+
 export default function BatchLinkForm() {
   const [clients, setClients] = useState<Client[]>([])
   const [clientId, setClientId] = useState<string>('')
@@ -217,6 +233,16 @@ export default function BatchLinkForm() {
                       </RouterLink>
                       <StatusDot tone="success">Created</StatusDot>
                     </div>
+                    {paramEntries(r.link).length > 0 && (
+                      <div className="flex flex-wrap gap-x-4 gap-y-1">
+                        {paramEntries(r.link).map((e) => (
+                          <span key={e.label} className="inline-flex items-baseline gap-1.5">
+                            <span className="eyebrow-sm">{e.label}</span>
+                            <span className="mono text-xs text-muted-foreground">{e.value}</span>
+                          </span>
+                        ))}
+                      </div>
+                    )}
                     <div className="flex flex-wrap items-center gap-2">
                       <button
                         onClick={() => copy(shortUrl(r.link!), `s-${r.key}`)}
