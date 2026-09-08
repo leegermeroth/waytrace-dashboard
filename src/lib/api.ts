@@ -531,6 +531,11 @@ export interface CustomDomain {
   created_at: string
   // Number of links stamped with this domain (present on the list response).
   link_count?: number
+  // Whether the */* catch-all route that actually serves custom domains is
+  // present. Only returned by GET /:id/status (not the list), and only when
+  // status === 'active'. false = SSL is active but links won't resolve (522);
+  // null/undefined = not checked or inconclusive.
+  serving?: boolean | null
 }
 
 export async function listDomains(): Promise<{ domains: CustomDomain[]; cnameTarget: string }> {

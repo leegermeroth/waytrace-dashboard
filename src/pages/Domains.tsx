@@ -160,38 +160,51 @@ export default function Domains() {
           </CardHeader>
           <CardContent>
             <div className="flex flex-col divide-y divide-border">
-              {domains.map((domain) => (
-                <div key={domain.id} className="flex items-center justify-between gap-4 py-3">
-                  <div className="flex flex-col gap-0.5">
-                    <span className="mono text-sm font-medium">{domain.hostname}</span>
-                    <span className="eyebrow-sm">
-                      Added {new Date(domain.created_at).toLocaleDateString()}
-                      {domain.link_count ? ` · ${domain.link_count} ${domain.link_count === 1 ? 'link' : 'links'}` : ''}
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <StatusBadge status={domain.status} />
-                    {domain.status !== 'active' && (
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => handleRefresh(domain.id)}
-                        disabled={refreshingId === domain.id}
-                      >
-                        {refreshingId === domain.id ? 'Checking…' : 'Check status'}
-                      </Button>
+              {domains.map((domain) => {
+                const notServing = domain.status === 'active' && domain.serving === false
+                return (
+                  <div key={domain.id} className="flex flex-col gap-2 py-3">
+                    <div className="flex items-center justify-between gap-4">
+                      <div className="flex flex-col gap-0.5">
+                        <span className="mono text-sm font-medium">{domain.hostname}</span>
+                        <span className="eyebrow-sm">
+                          Added {new Date(domain.created_at).toLocaleDateString()}
+                          {domain.link_count ? ` · ${domain.link_count} ${domain.link_count === 1 ? 'link' : 'links'}` : ''}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <StatusBadge status={domain.status} />
+                        {notServing && <Badge variant="destructive">Links not resolving</Badge>}
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => handleRefresh(domain.id)}
+                          disabled={refreshingId === domain.id}
+                        >
+                          {refreshingId === domain.id ? 'Checking…' : 'Check status'}
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => handleDelete(domain.id, domain.hostname)}
+                          disabled={deletingId === domain.id}
+                        >
+                          {deletingId === domain.id ? 'Removing…' : 'Remove'}
+                        </Button>
+                      </div>
+                    </div>
+                    {notServing && (
+                      <Alert variant="destructive">
+                        <AlertDescription className="text-xs">
+                          The SSL certificate for <span className="mono">{domain.hostname}</span> is active, but its
+                          links aren’t resolving right now — short links on this domain may return a connection error.
+                          This is a routing issue on our side, not your DNS. Please contact support.
+                        </AlertDescription>
+                      </Alert>
                     )}
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => handleDelete(domain.id, domain.hostname)}
-                      disabled={deletingId === domain.id}
-                    >
-                      {deletingId === domain.id ? 'Removing…' : 'Remove'}
-                    </Button>
                   </div>
-                </div>
-              ))}
+                )
+              })}
             </div>
           </CardContent>
         </Card>
