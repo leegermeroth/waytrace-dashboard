@@ -4,6 +4,7 @@ import test from 'node:test'
 import {
   advancedCampaignTypes,
   findPlatform,
+  isAdTrackingLink,
   isMacroAllowed,
   macroLabel,
   offerableMacros,
@@ -131,4 +132,25 @@ test('findPlatform and macroLabel degrade gracefully', () => {
   assert.equal(macroLabel(meta, 'ad_name'), 'Ad name')
   assert.equal(macroLabel(meta, 'unknown_macro'), 'unknown_macro')
   assert.equal(macroLabel(meta, undefined), '')
+})
+
+test("isAdTrackingLink never conflates 'tracking' with 'ad_tracking'", () => {
+  assert.equal(isAdTrackingLink({ link_type: 'ad_tracking' }), true)
+
+  // The whole point: 'tracking' is an ORDINARY redirecting link that must keep
+  // its short URL, QR code, and click counters. It is also a substring of
+  // 'ad_tracking', which is why every comparison is strict equality.
+  assert.equal(isAdTrackingLink({ link_type: 'tracking' }), false)
+  assert.equal('ad_tracking'.includes('tracking'), true)
+
+  assert.equal(isAdTrackingLink({ link_type: 'short' }), false)
+  assert.equal(isAdTrackingLink({ link_type: '' }), false)
+  assert.equal(isAdTrackingLink({ link_type: null }), false)
+  assert.equal(isAdTrackingLink({}), false)
+})
+
+test('isAdTrackingLink is not fooled by near-miss values', () => {
+  for (const value of ['Ad_Tracking', 'AD_TRACKING', 'ad-tracking', 'ad_tracking ', 'xad_tracking']) {
+    assert.equal(isAdTrackingLink({ link_type: value }), false, `${value} must not match`)
+  }
 })

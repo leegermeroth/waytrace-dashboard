@@ -13,6 +13,21 @@ import type { AdCampaignTypeDto, AdMacroDto, AdParam, AdPlatformDto, AdPlatformI
  * tests/ad-platforms.test.ts pin the cases that would drift silently.
  */
 
+/**
+ * The ad-tracking discriminator, defined once (plan §7.6).
+ *
+ * ALWAYS compare link types with strict equality. 'tracking' is both an
+ * existing production value AND a substring of 'ad_tracking', so
+ * includes()/startsWith()/a LIKE would match both — and would hand an ad
+ * tracking link the behaviour of an ordinary redirecting link: a short URL
+ * built from the unroutable sentinel domain, a QR code encoding unresolved
+ * macros, and a "0 clicks" reading that claims we measured no traffic rather
+ * than that we measured none of it.
+ */
+export function isAdTrackingLink(link: { link_type?: string | null }): boolean {
+  return link.link_type === 'ad_tracking'
+}
+
 export function findPlatform(
   platforms: AdPlatformDto[],
   id: AdPlatformId | ''

@@ -18,6 +18,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert'
 import { PageHeader } from '@/components/brand'
 import BatchLinkForm from '@/pages/BatchLinkForm'
 import AdTrackingLinkForm from '@/pages/AdTrackingLinkForm'
+import { isAdTrackingLink } from '@/lib/adPlatformRules'
 
 /**
  * Dispatcher: creating links uses the batch-first builder; editing an existing
@@ -68,7 +69,7 @@ function EditDispatcher({ id }: { id: string }) {
   }
   // Strict equality: 'tracking' is a substring of 'ad_tracking' but is an
   // ordinary redirecting link that belongs in the standard editor.
-  if (link.link_type === 'ad_tracking') return <AdTrackingLinkForm />
+  if (isAdTrackingLink(link)) return <AdTrackingLinkForm />
   return <EditLinkForm id={id} preloaded={link} />
 }
 

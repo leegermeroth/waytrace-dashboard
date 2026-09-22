@@ -36,6 +36,8 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { PageHeader, StatCard } from '@/components/brand'
 import { QrDialog } from '@/components/QrDialog'
+import { AdTrackingLinkDetail } from '@/components/AdTrackingLinkDetail'
+import { isAdTrackingLink } from '@/lib/adPlatformRules'
 import { ClickMap } from '@/components/ClickMap'
 import { InfoHint } from '@/components/InfoHint'
 import {
@@ -87,23 +89,54 @@ export default function LinkDetail() {
 
   useEffect(() => {
     if (!id) return
-    Promise.all([listLinks(), getLinkStats(Number(id)), getLinkHistory(Number(id))])
-      .then(([links, statsData, historyData]) => {
-        const found = links.find((l) => l.id === Number(id))
+    let cancelled = false
+
+    async function load() {
+      try {
+        // Resolve the link first: an ad tracking link renders a different view
+        // and has neither Waytrace clicks nor a ga4_id, so the stats and GA4
+        // calls would only ever come back empty or "unavailable". Destination
+        // history still applies to both — for an ad tracking link it matters
+        // MORE, since Waytrace cannot update an already-published ad.
+        const links = await listLinks()
+        if (cancelled) return
+
+        const found = links.find((l) => l.id === Number(id)) ?? null
         if (!found) {
           setError('Link not found')
-        } else {
-          setLink(found)
+          return
         }
-        setStats(statsData)
+        setLink(found)
+
+        const historyData = await getLinkHistory(Number(id))
+        if (cancelled) return
         setHistory(historyData)
-      })
-      .catch((err) => setError(err instanceof Error ? err.message : 'Failed to load link'))
-      .finally(() => setIsLoading(false))
-    // GA4 is a slower best-effort side channel — never blocks the page.
-    getLinkGa4(Number(id))
-      .then(setGa4)
-      .catch(() => setGa4(null))
+
+        if (isAdTrackingLink(found)) return
+
+        const statsData = await getLinkStats(Number(id))
+        if (cancelled) return
+        setStats(statsData)
+
+        // GA4 is a slower best-effort side channel — never blocks the page.
+        getLinkGa4(Number(id))
+          .then((report) => {
+            if (!cancelled) setGa4(report)
+          })
+          .catch(() => {
+            if (!cancelled) setGa4(null)
+          })
+      } catch (err) {
+        if (!cancelled) setError(err instanceof Error ? err.message : 'Failed to load link')
+      } finally {
+        if (!cancelled) setIsLoading(false)
+      }
+    }
+
+    load()
+    return () => {
+      cancelled = true
+    }
   }, [id])
 
   async function handleCopy() {
@@ -141,6 +174,14 @@ export default function LinkDetail() {
         <AlertDescription>{error || 'Link not found'}</AlertDescription>
       </Alert>
     )
+  }
+
+  // Ad tracking links get their own view: no short link, no QR, no click data,
+  // and their copyable strings are the ad platform's parameter fields rather
+  // than a Waytrace URL. Strict equality — 'tracking' is a substring of
+  // 'ad_tracking' but is an ordinary redirecting link.
+  if (isAdTrackingLink(link)) {
+    return <AdTrackingLinkDetail link={link} history={history} onDelete={handleDelete} />
   }
 
   const utmParams = [

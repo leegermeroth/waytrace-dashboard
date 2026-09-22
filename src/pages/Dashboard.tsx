@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link as RouterLink } from 'react-router-dom'
 import { useAuth } from '@/context/AuthContext'
 import { listLinks, type Link } from '@/lib/api'
+import { isAdTrackingLink } from '@/lib/adPlatformRules'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Alert, AlertDescription } from '@/components/ui/alert'
@@ -29,7 +30,15 @@ export default function Dashboard() {
   const totalLinks = links.length
   const totalClicks = links.reduce((sum, l) => sum + l.clicks, 0)
   const totalScans = links.reduce((sum, l) => sum + l.scans, 0)
-  const topLinks = [...links].sort((a, b) => b.clicks - a.clicks).slice(0, 5)
+  // "Best performing by clicks" cannot rank ad tracking links: Waytrace never
+  // sees their traffic, so they always carry 0 and would both crowd out real
+  // results and render as "0 clicks" — which claims we measured no traffic
+  // rather than that we measured none of it. They are excluded, not zeroed.
+  // (They still count in Total links, which is simply how many links exist.)
+  const topLinks = [...links]
+    .filter((l) => !isAdTrackingLink(l))
+    .sort((a, b) => b.clicks - a.clicks)
+    .slice(0, 5)
   const planLabel = tier ? TIER_LABELS[tier] ?? tier : '—'
 
   return (

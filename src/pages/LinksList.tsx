@@ -9,6 +9,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert'
 import { PageHeader, StatusDot } from '@/components/brand'
 import { QrDialog } from '@/components/QrDialog'
 import { buildTrackingUrl, scanUrl, shortUrl } from '@/lib/links'
+import { isAdTrackingLink } from '@/lib/adPlatformRules'
 import {
   Table,
   TableBody,
@@ -33,6 +34,24 @@ function assetMeta(link: Link): { label: string; route: string; noun: string } |
   return link.collection_type === 'person'
     ? { label: 'Team Card', route: `/dashboard/cards/${link.collection_id}`, noun: 'card' }
     : { label: 'Packaging', route: `/dashboard/packaging/${link.collection_id}`, noun: 'SKU' }
+}
+
+/**
+ * Ad Tracking Links (v1.38) do not route through Waytrace: the advertising
+ * platform sends the visitor straight to the landing page. They have no short
+ * link, no QR code, and no Waytrace click data at all.
+ *
+ * That last point drives the rendering below — showing "0" would claim we
+ * observed zero traffic when in fact we observed none of it. The discriminator
+ * itself lives in lib/adPlatformRules so every surface agrees on it.
+ */
+const isAdTracking = isAdTrackingLink
+
+/** Platform badge text for an ad tracking link. */
+function adPlatformLabel(link: Link): string {
+  if (link.ad_platform === 'meta') return 'Meta Ads'
+  if (link.ad_platform === 'google') return 'Google Ads'
+  return 'Ad tracking'
 }
 
 /** A quiet toggle chip for the boolean quick-filters. */
@@ -139,6 +158,15 @@ export default function LinksList() {
     })
 
     result = [...result].sort((a, b) => {
+      // Ad tracking links have no Waytrace click data, so they are not "zero" —
+      // they are absent. Group them at the end of the count columns in BOTH
+      // directions rather than letting them rank as the lowest number.
+      if (sortKey === 'clicks' || sortKey === 'scans') {
+        const aAd = isAdTracking(a)
+        const bAd = isAdTracking(b)
+        if (aAd !== bAd) return aAd ? 1 : -1
+      }
+
       let cmp = 0
       if (sortKey === 'label') {
         cmp = (a.label || a.short_code).localeCompare(b.label || b.short_code)
@@ -373,9 +401,24 @@ export default function LinksList() {
                           </RouterLink>
                         ) : null
                       })()}
+                      {/* Restrained on purpose (§36): enough to make clear this
+                          link does not route through Waytrace, no more. */}
+                      {isAdTracking(link) && (
+                        <Badge
+                          variant="outline"
+                          title="Goes straight to the destination — Waytrace does not record these clicks"
+                        >
+                          {adPlatformLabel(link)}
+                        </Badge>
+                      )}
                     </div>
                   </TableCell>
                   <TableCell>
+                    {isAdTracking(link) ? (
+                      // Deliberately NOT shortUrl(link): these carry the reserved
+                      // ad-tracking.invalid domain, which is unroutable by design.
+                      <span className="mono text-xs text-muted-foreground">Direct</span>
+                    ) : (
                     <button
                       onClick={() => copy(shortUrl(link), `short-${link.id}`)}
                       title={copiedKey === `short-${link.id}` ? 'Copied' : 'Click to copy short link'}
@@ -389,6 +432,7 @@ export default function LinksList() {
                         <Copy className="size-3.5 opacity-50 transition-opacity group-hover/copy:opacity-100" />
                       )}
                     </button>
+                    )}
                   </TableCell>
                   <TableCell>
                     <ValueCell value={link.utm_source} onClick={(v) => setSourceFilter(v)} />
@@ -399,24 +443,39 @@ export default function LinksList() {
                   <TableCell>
                     <ValueCell value={link.utm_campaign} onClick={(v) => setCampaignFilter(v)} />
                   </TableCell>
-                  <TableCell className="mono">
-                    <RouterLink
-                      to={`/dashboard/links/${link.id}`}
-                      title="View link stats"
-                      className="cursor-pointer text-foreground hover:text-ochre"
+                  {isAdTracking(link) ? (
+                    // One "External" spanning both count columns: Waytrace did
+                    // not observe this traffic, so there is nothing to report per
+                    // column and "0 / 0" would be an untrue claim.
+                    <TableCell
+                      colSpan={2}
+                      className="text-xs text-muted-foreground"
+                      title="This link sends visitors directly to the destination, so Waytrace does not record clicks."
                     >
-                      {link.clicks}
-                    </RouterLink>
-                  </TableCell>
-                  <TableCell className="mono">
-                    <RouterLink
-                      to={`/dashboard/links/${link.id}`}
-                      title="View link stats"
-                      className="cursor-pointer text-foreground hover:text-ochre"
-                    >
-                      {link.scans}
-                    </RouterLink>
-                  </TableCell>
+                      External
+                    </TableCell>
+                  ) : (
+                    <>
+                      <TableCell className="mono">
+                        <RouterLink
+                          to={`/dashboard/links/${link.id}`}
+                          title="View link stats"
+                          className="cursor-pointer text-foreground hover:text-ochre"
+                        >
+                          {link.clicks}
+                        </RouterLink>
+                      </TableCell>
+                      <TableCell className="mono">
+                        <RouterLink
+                          to={`/dashboard/links/${link.id}`}
+                          title="View link stats"
+                          className="cursor-pointer text-foreground hover:text-ochre"
+                        >
+                          {link.scans}
+                        </RouterLink>
+                      </TableCell>
+                    </>
+                  )}
                   <TableCell>
                     <StatusDot tone={link.is_active ? 'success' : 'neutral'}>
                       {link.is_active ? 'Active' : 'Inactive'}
@@ -424,31 +483,40 @@ export default function LinksList() {
                   </TableCell>
                   <TableCell className="text-right">
                     <div className="flex justify-end gap-0.5">
-                      <Button
-                        variant="ghost"
-                        size="icon-sm"
-                        title="Copy tracking URL"
-                        aria-label="Copy tracking URL"
-                        onClick={() => copy(buildTrackingUrl(link.destination_url, link, link.ga4_id), `track-${link.id}`)}
-                      >
-                        {copiedKey === `track-${link.id}` ? (
-                          <Check className="size-3.5 text-success" />
-                        ) : (
-                          <Copy className="size-3.5" />
-                        )}
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon-sm"
-                        title="QR code"
-                        aria-label="QR code"
-                        onClick={() => {
-                          setQrUrl(scanUrl(link))
-                          setQrLabel(link.label || link.short_code)
-                        }}
-                      >
-                        <QrIcon className="size-3.5" />
-                      </Button>
+                      {/* Neither action applies to an ad tracking link: there is
+                          no Waytrace tracking URL to copy (its parameters live in
+                          the ad platform's own field, on the link's own page), and
+                          a QR code would encode unresolved macros — the codes only
+                          mean anything when the ad platform fills them in. */}
+                      {!isAdTracking(link) && (
+                        <>
+                          <Button
+                            variant="ghost"
+                            size="icon-sm"
+                            title="Copy tracking URL"
+                            aria-label="Copy tracking URL"
+                            onClick={() => copy(buildTrackingUrl(link.destination_url, link, link.ga4_id), `track-${link.id}`)}
+                          >
+                            {copiedKey === `track-${link.id}` ? (
+                              <Check className="size-3.5 text-success" />
+                            ) : (
+                              <Copy className="size-3.5" />
+                            )}
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon-sm"
+                            title="QR code"
+                            aria-label="QR code"
+                            onClick={() => {
+                              setQrUrl(scanUrl(link))
+                              setQrLabel(link.label || link.short_code)
+                            }}
+                          >
+                            <QrIcon className="size-3.5" />
+                          </Button>
+                        </>
+                      )}
                       {/* Asset-managed links edit in their collection, where the
                           authoritative SKU/card fields live (#29); ordinary links
                           use the generic editor. */}
