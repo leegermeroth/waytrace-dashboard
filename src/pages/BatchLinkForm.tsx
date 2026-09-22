@@ -16,6 +16,7 @@ import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { PageHeader, StatusDot } from '@/components/brand'
+import { useAuth } from '@/context/AuthContext'
 import {
   Select,
   SelectContent,
@@ -71,6 +72,10 @@ function paramEntries(link: Link): { label: string; value: string }[] {
 }
 
 export default function BatchLinkForm() {
+  const { tier, isEnterprise } = useAuth()
+  // Team (internal `agency`) and Enterprise. Matches the Worker's gate.
+  const canUseAdTracking = tier === 'agency' || isEnterprise
+
   const [clients, setClients] = useState<Client[]>([])
   const [clientId, setClientId] = useState<string>('')
   const [campaign, setCampaign] = useState('')
@@ -315,9 +320,19 @@ export default function BatchLinkForm() {
         title="New links"
         description="Build a batch of tracking links that share one campaign. Each row becomes its own saved link."
         actions={
-          <Button variant="outline" render={<RouterLink to="/dashboard/links" />}>
-            Cancel
-          </Button>
+          <>
+            {/* The other kind of link you can create. Surfaced here rather than
+                as a step in front of this form, so the common path keeps its
+                current number of clicks. Team/Enterprise only. */}
+            {canUseAdTracking && (
+              <Button variant="outline" render={<RouterLink to="/dashboard/links/new/ad" />}>
+                Ad tracking link
+              </Button>
+            )}
+            <Button variant="outline" render={<RouterLink to="/dashboard/links" />}>
+              Cancel
+            </Button>
+          </>
         }
       />
 

@@ -197,6 +197,11 @@ export interface Link {
   collection_id?: number | null
   collection_type?: 'product' | 'person' | null
   collection_name?: string | null
+  // Ad Tracking Links (v1.38): non-null when link_type === 'ad_tracking'. The
+  // library uses these to badge the platform and to show "Analytics: External"
+  // instead of a misleading zero click count — Waytrace never sees these clicks.
+  ad_platform?: 'meta' | 'google' | null
+  ad_campaign_type?: string | null
 }
 
 export interface LinkInput {
@@ -1198,4 +1203,161 @@ export function listAdminAccounts() {
 /** Platform-wide totals. */
 export function getPlatformStats() {
   return request<PlatformStats>('/api/v1/admin/stats')
+}
+
+// ---------------------------------------------------------------------------
+// Ad Tracking Links (v1.38)
+//
+// Direct long-form advertising URLs carrying the ad platforms' own dynamic
+// macros. Traffic goes ad platform -> customer landing page; Waytrace is never
+// in the request path and records no clicks for them.
+//
+// IMPORTANT: the dashboard NEVER builds one of these URLs. The Worker owns the
+// only serializer, because URLSearchParams percent-encodes braces and would
+// silently corrupt every macro ({{campaign.id}} -> %7B%7B...). Saved links
+// render their stored strings; the live preview calls /preview, which runs the
+// exact same code as the save that follows it.
+// ---------------------------------------------------------------------------
+
+export type AdPlatformId = 'meta' | 'google'
+export type AdParamType = 'static' | 'platform_dynamic'
+
+export interface AdParam {
+  key: string
+  value: string
+  type: AdParamType
+  /** Registry macro id; present when type === 'platform_dynamic'. */
+  macro?: string
+  enabled: boolean
+}
+
+export interface AdMacroDto {
+  id: string
+  syntax: string
+  label: string
+  description: string
+  kind: 'id' | 'name' | 'context'
+  recommended: boolean
+  /** Present when the macro exists only for certain campaign types. */
+  campaign_types?: string[]
+  warning?: string
+}
+
+export interface AdCampaignTypeDto {
+  id: string
+  label: string
+  advanced: boolean
+  /** General-purpose macros this campaign type does not support. */
+  unsupported_macros: string[]
+}
+
+export interface AdOutputDto {
+  id: 'params' | 'final_url' | 'full_url' | 'destination'
+  label: string
+  helper: string
+  primary?: boolean
+}
+
+export interface AdPlatformDto {
+  id: AdPlatformId
+  label: string
+  macro_syntax: 'double_brace' | 'single_brace'
+  /** When this macro set was last verified against the platform's own docs. */
+  verified_at: string
+  instructions: string
+  campaign_types?: AdCampaignTypeDto[]
+  macros: AdMacroDto[]
+  outputs: AdOutputDto[]
+  /** Keyed by campaign type id, or 'default' for platforms without types. */
+  presets: Record<string, AdParam[]>
+}
+
+export interface AdValidationIssue {
+  field: string
+  code: string
+  message: string
+}
+
+export interface AdConfigInput {
+  platform: AdPlatformId | ''
+  campaign_type: string | null
+  destination_url: string
+  params: AdParam[]
+  acknowledge_duplicates?: boolean
+}
+
+export interface AdPreviewResult {
+  valid: boolean
+  errors: AdValidationIssue[]
+  warnings: AdValidationIssue[]
+  params?: AdParam[]
+  /** Parameter string for the platform's own field. Never prefixed with '?'. */
+  suffix?: string
+  final_url?: string
+  full_url?: string
+  destination?: string
+}
+
+export interface AdTrackingConfig {
+  link_id: number
+  client_id: number
+  label: string | null
+  destination_url: string
+  platform: AdPlatformId
+  campaign_type: string | null
+  params: AdParam[]
+  suffix: string
+  full_url: string
+  final_url: string
+  updated_at: string
+  /**
+   * Non-blocking problems with a SAVED config — e.g. a macro the platform no
+   * longer supports. Surfaced as a notice, never as an error, and the stored
+   * configuration is never auto-rewritten: its generated strings may already be
+   * pasted into a live ad.
+   */
+  notices: AdValidationIssue[]
+}
+
+export interface AdTrackingLink extends Link {
+  params: AdParam[]
+  suffix: string
+  final_url: string
+  full_url: string
+  warnings: AdValidationIssue[]
+}
+
+/** The macro registry. Cached by lib/adPlatforms.ts — call that, not this. */
+export function listAdPlatforms() {
+  return request<AdPlatformDto[]>('/api/v1/ad-platforms')
+}
+
+/**
+ * Validate and generate without saving. Returns 200 even when invalid — a form
+ * being filled in is an expected state, not a transport error — so read
+ * `valid`/`errors` rather than catching.
+ */
+export function previewAdTrackingLink(input: AdConfigInput) {
+  return request<AdPreviewResult>('/api/v1/links/ad-tracking/preview', {
+    method: 'POST',
+    body: JSON.stringify(input),
+  })
+}
+
+export function createAdTrackingLink(input: AdConfigInput & { client_id: number; label?: string }) {
+  return request<AdTrackingLink>('/api/v1/links/ad-tracking', {
+    method: 'POST',
+    body: JSON.stringify(input),
+  })
+}
+
+export function getAdTrackingConfig(id: number) {
+  return request<AdTrackingConfig>(`/api/v1/links/${id}/ad-tracking`)
+}
+
+export function updateAdTrackingLink(id: number, input: AdConfigInput & { label?: string }) {
+  return request<AdTrackingConfig>(`/api/v1/links/${id}/ad-tracking`, {
+    method: 'PUT',
+    body: JSON.stringify(input),
+  })
 }

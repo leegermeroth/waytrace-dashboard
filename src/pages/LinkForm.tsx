@@ -17,6 +17,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { PageHeader } from '@/components/brand'
 import BatchLinkForm from '@/pages/BatchLinkForm'
+import AdTrackingLinkForm from '@/pages/AdTrackingLinkForm'
 
 /**
  * Dispatcher: creating links uses the batch-first builder; editing an existing
@@ -24,10 +25,54 @@ import BatchLinkForm from '@/pages/BatchLinkForm'
  */
 export default function LinkForm() {
   const { id } = useParams()
-  return id ? <EditLinkForm id={id} /> : <BatchLinkForm />
+  return id ? <EditDispatcher id={id} /> : <BatchLinkForm />
 }
 
-function EditLinkForm({ id }: { id: string }) {
+/**
+ * An ad tracking link needs a different editor: it has no short link and no UTM
+ * columns, and its parameters have to be regenerated together with its
+ * destination (the Worker rejects editing one through the standard route). So
+ * resolve which editor applies before rendering either, and hand the
+ * already-fetched link to the standard form so it is not fetched twice.
+ */
+function EditDispatcher({ id }: { id: string }) {
+  const [link, setLink] = useState<Link | null>(null)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    let cancelled = false
+    listLinks()
+      .then((links) => {
+        if (cancelled) return
+        const found = links.find((l) => l.id === Number(id)) ?? null
+        if (!found) setError('Link not found')
+        setLink(found)
+      })
+      .catch((err) => {
+        if (!cancelled) setError(err instanceof Error ? err.message : 'Failed to load form')
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [id])
+
+  if (error) {
+    return (
+      <Alert variant="destructive">
+        <AlertDescription>{error}</AlertDescription>
+      </Alert>
+    )
+  }
+  if (!link) {
+    return <p className="font-serif text-sm text-muted-foreground italic">Loading...</p>
+  }
+  // Strict equality: 'tracking' is a substring of 'ad_tracking' but is an
+  // ordinary redirecting link that belongs in the standard editor.
+  if (link.link_type === 'ad_tracking') return <AdTrackingLinkForm />
+  return <EditLinkForm id={id} preloaded={link} />
+}
+
+function EditLinkForm({ id, preloaded }: { id: string; preloaded?: Link }) {
   const navigate = useNavigate()
 
   const [clients, setClients] = useState<Client[]>([])
@@ -55,8 +100,7 @@ function EditLinkForm({ id }: { id: string }) {
         const clientList = await listClients()
         setClients(clientList)
 
-        const links = await listLinks()
-        const link = links.find((l) => l.id === Number(id))
+        const link = preloaded ?? (await listLinks()).find((l) => l.id === Number(id))
         if (!link) {
           setError('Link not found')
         } else {

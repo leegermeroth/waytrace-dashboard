@@ -16,6 +16,7 @@ import Terms from '@/pages/Terms'
 import Privacy from '@/pages/Privacy'
 import Dashboard from '@/pages/Dashboard'
 import LinksList from '@/pages/LinksList'
+import AdTrackingLinkForm from '@/pages/AdTrackingLinkForm'
 import LinkForm from '@/pages/LinkForm'
 import LinkDetail from '@/pages/LinkDetail'
 import Analytics from '@/pages/Analytics'
@@ -57,6 +58,10 @@ export default function App() {
               {/* Analytics is read-only — available to contributors too (no AdminRoute). */}
               <Route path="/dashboard/analytics" element={<Analytics />} />
               <Route path="/dashboard/links/new" element={<LinkForm />} />
+              {/* Ad Tracking Links (Team/Enterprise). Static segment, so it
+                  ranks above /dashboard/links/:id. The page gates on tier
+                  itself, so a direct visit explains rather than 404s. */}
+              <Route path="/dashboard/links/new/ad" element={<AdTrackingLinkForm />} />
               <Route path="/dashboard/links/:id" element={<LinkDetail />} />
               <Route path="/dashboard/links/:id/edit" element={<LinkForm />} />
               <Route path="/dashboard/settings" element={<Settings />} />
