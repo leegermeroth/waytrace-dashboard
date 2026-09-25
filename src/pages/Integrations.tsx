@@ -24,6 +24,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { PageHeader } from '@/components/brand'
+import { AdTrackingGa4SetupPanel } from '@/components/AdTrackingGa4SetupPanel'
 
 const NONE = 'none'
 const mappingValue = (connectionId?: number | null, propertyId?: string | null) =>
@@ -51,6 +52,7 @@ export default function Integrations() {
   const [revokingCredentialId, setRevokingCredentialId] = useState<number | null>(null)
   const [downloadingPlugin, setDownloadingPlugin] = useState(false)
   const [loadError, setLoadError] = useState<string | null>(null)
+  const [ga4Error, setGa4Error] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
 
   const [connecting, setConnecting] = useState(false)
@@ -80,6 +82,8 @@ export default function Integrations() {
 
   async function loadAll() {
     setLoading(true)
+    setLoadError(null)
+    setGa4Error(null)
     try {
       const meData = await getMe()
       setMe(meData)
@@ -88,9 +92,22 @@ export default function Integrations() {
         return
       }
       const isOwner = meData.user_id == null
+      // GA4 can legitimately fail independently of everything else on this page
+      // (not configured on the server, a login needing reconnect, a transient
+      // Google error) — caught per-call, same as the plugin/site-credential
+      // calls below, so one GA4 hiccup can't take out the workspace list, the
+      // WordPress plugin card, or the ad-tracking GA4 setup panel with it. A
+      // bare Promise.all here previously meant any GA4 failure silently
+      // discarded a successful listClients() result too.
       const [conns, props, cls, pluginInfo, sites] = await Promise.all([
-        getGa4Connections(),
-        getGa4Properties(),
+        getGa4Connections().catch((err) => {
+          setGa4Error((prev) => prev ?? (err instanceof Error ? err.message : 'Failed to load Google Analytics connections'))
+          return []
+        }),
+        getGa4Properties().catch((err) => {
+          setGa4Error((prev) => prev ?? (err instanceof Error ? err.message : 'Failed to load Google Analytics properties'))
+          return { properties: [], errors: [] }
+        }),
         listClients(),
         // Plugin download and site-credential management are owner-only.
         isOwner ? getPluginInfo().catch(() => null) : Promise.resolve(null),
@@ -329,8 +346,20 @@ export default function Integrations() {
           </CardDescription>
         </CardHeader>
         <CardContent className="flex flex-col gap-4">
+          {ga4Error && (
+            <Alert variant="destructive">
+              <AlertDescription>
+                Couldn't load your Google Analytics connections: {ga4Error}
+              </AlertDescription>
+            </Alert>
+          )}
+
           {connections.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No Google accounts connected yet.</p>
+            <p className="text-sm text-muted-foreground">
+              {ga4Error
+                ? 'Unable to confirm whether any Google accounts are connected right now.'
+                : 'No Google accounts connected yet.'}
+            </p>
           ) : (
             <div className="flex flex-col divide-y divide-border">
               {connections.map((conn) => (
@@ -428,6 +457,8 @@ export default function Integrations() {
           </CardContent>
         </Card>
       )}
+
+      <AdTrackingGa4SetupPanel clients={clients} />
     </div>
   )
 }

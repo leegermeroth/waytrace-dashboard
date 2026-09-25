@@ -1,4 +1,4 @@
-import { listAdPlatforms, type AdPlatformDto } from '@/lib/api'
+import { listAdPlatforms, type AdPlatformsRegistryDto } from '@/lib/api'
 
 /**
  * Ad platform registry access (AD_TRACKING_LINKS_PLAN.md D4).
@@ -16,9 +16,9 @@ import { listAdPlatforms, type AdPlatformDto } from '@/lib/api'
  * directly testable) and are re-exported here for convenience.
  */
 
-let cache: Promise<AdPlatformDto[]> | null = null
+let cache: Promise<AdPlatformsRegistryDto> | null = null
 
-export function loadAdPlatforms(): Promise<AdPlatformDto[]> {
+export function loadAdPlatforms(): Promise<AdPlatformsRegistryDto> {
   if (!cache) {
     cache = listAdPlatforms().catch((err) => {
       cache = null

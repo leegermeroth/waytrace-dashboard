@@ -1272,6 +1272,23 @@ export interface AdPlatformDto {
   presets: Record<string, AdParam[]>
 }
 
+/**
+ * Waytrace's own attribution parameter (AD_TRACKING_LINKS_GA4_PLAN.md §3.4) —
+ * platform-agnostic, so it lives outside `platforms`. Not a macro of either
+ * platform and not user-configurable; appended to every generated link
+ * server-side. AdLinkPreview renders it as a fixed row, never a "Dynamic" badge.
+ */
+export interface AttributionParamDto {
+  key: string
+  label: string
+  description: string
+}
+
+export interface AdPlatformsRegistryDto {
+  platforms: AdPlatformDto[]
+  attribution_param: AttributionParamDto
+}
+
 export interface AdValidationIssue {
   field: string
   code: string
@@ -1329,7 +1346,7 @@ export interface AdTrackingLink extends Link {
 
 /** The macro registry. Cached by lib/adPlatforms.ts — call that, not this. */
 export function listAdPlatforms() {
-  return request<AdPlatformDto[]>('/api/v1/ad-platforms')
+  return request<AdPlatformsRegistryDto>('/api/v1/ad-platforms')
 }
 
 /**
@@ -1360,4 +1377,56 @@ export function updateAdTrackingLink(id: number, input: AdConfigInput & { label?
     method: 'PUT',
     body: JSON.stringify(input),
   })
+}
+
+// ── GA4 measurement setup (AD_TRACKING_LINKS_GA4_PLAN.md §4-§6) ─────────────
+
+export interface AdTrackingGa4SetupKey {
+  key: string
+  suggested_label: string
+  always_present: boolean
+}
+
+export interface AdTrackingGa4Setup {
+  client_id: number
+  ga4_connected: boolean
+  ga4_property_name: string | null
+  keys: AdTrackingGa4SetupKey[]
+  link_count: number
+}
+
+export function getAdTrackingGa4Setup(clientId: number) {
+  return request<AdTrackingGa4Setup>(`/api/v1/clients/${clientId}/ad-tracking/ga4-setup`)
+}
+
+export function getAdTrackingGtagSnippet(clientId: number) {
+  return request<{ snippet: string }>(`/api/v1/clients/${clientId}/ad-tracking/ga4-setup/gtag-snippet`)
+}
+
+/**
+ * The GTM variables-import file is a raw download (Content-Disposition:
+ * attachment), not the usual {success,data} envelope, so it can't go through
+ * request(). Fetches it with the same auth header request() uses, then hands
+ * the browser a Blob to save — the one place in this module that talks to
+ * `document` directly.
+ */
+export async function downloadAdTrackingGtmExport(clientId: number): Promise<void> {
+  const res = await fetch(
+    `${API_URL}/api/v1/clients/${clientId}/ad-tracking/ga4-setup/gtm-export`,
+    { headers: authHeaders() }
+  )
+  if (!res.ok) {
+    const body: ApiEnvelope<never> | null = await res.json().catch(() => null)
+    reportAuthFailure(res.status, Boolean(authHeaders().Authorization))
+    throw new ApiError(body?.error || `Request failed with status ${res.status}`, res.status)
+  }
+  const blob = await res.blob()
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = 'waytrace-ad-tracking-variables.json'
+  document.body.appendChild(a)
+  a.click()
+  a.remove()
+  URL.revokeObjectURL(url)
 }

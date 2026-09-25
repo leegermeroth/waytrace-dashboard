@@ -10,6 +10,7 @@ import {
   type AdPlatformDto,
   type AdPlatformId,
   type AdPreviewResult,
+  type AttributionParamDto,
   type Client,
 } from '@/lib/api'
 import { loadAdPlatforms, presetFor, primaryCampaignTypes } from '@/lib/adPlatforms'
@@ -44,6 +45,7 @@ export default function AdTrackingLinkForm() {
   const entitled = tier === 'agency' || isEnterprise
 
   const [platforms, setPlatforms] = useState<AdPlatformDto[]>([])
+  const [attributionParam, setAttributionParam] = useState<AttributionParamDto | null>(null)
   const [clients, setClients] = useState<Client[]>([])
   const [clientId, setClientId] = useState('')
   const [platformId, setPlatformId] = useState<AdPlatformId | ''>('')
@@ -77,7 +79,8 @@ export default function AdTrackingLinkForm() {
       try {
         const [registry, clientList] = await Promise.all([loadAdPlatforms(), listClients()])
         if (cancelled) return
-        setPlatforms(registry)
+        setPlatforms(registry.platforms)
+        setAttributionParam(registry.attribution_param)
         setClients(clientList)
         if (clientList.length === 1) setClientId(String(clientList[0].id))
 
@@ -457,7 +460,13 @@ export default function AdTrackingLinkForm() {
                   </p>
                 )}
 
-                {preview?.valid && <AdLinkPreview platform={platform} preview={preview} />}
+                {preview?.valid && (
+                  <AdLinkPreview
+                    platform={platform}
+                    preview={preview}
+                    attributionParam={attributionParam ?? undefined}
+                  />
+                )}
 
                 {!preview && !previewing && (
                   <p className="text-sm text-muted-foreground">

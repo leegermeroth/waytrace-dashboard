@@ -1,7 +1,11 @@
 import { useState } from 'react'
-import type { AdOutputDto, AdParam, AdPlatformDto, AdPreviewResult } from '@/lib/api'
+import type { AdOutputDto, AdParam, AdPlatformDto, AdPreviewResult, AttributionParamDto } from '@/lib/api'
+import { extractParamValue } from '@/lib/adPlatformRules'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
+
+/** The server's display sentinel for a not-yet-saved link — must match the Worker's PREVIEW_LINK_ID literal. */
+const PREVIEW_LINK_ID = '<assigned-on-save>'
 
 /**
  * Preview + copy actions for an Ad Tracking Link (brief §13, §26, §37, §38).
@@ -16,10 +20,13 @@ import { Badge } from '@/components/ui/badge'
 export function AdLinkPreview({
   platform,
   preview,
+  attributionParam,
   showBreakdown = true,
 }: {
   platform: AdPlatformDto
   preview: AdPreviewResult
+  /** From GET /api/v1/ad-platforms. Renders the server-appended wt_link_id row. */
+  attributionParam?: AttributionParamDto
   showBreakdown?: boolean
 }) {
   const [copiedId, setCopiedId] = useState<string | null>(null)
@@ -40,6 +47,10 @@ export function AdLinkPreview({
   if (!preview.valid) return null
 
   const enabled = (preview.params ?? []).filter((p) => p.enabled)
+  const attributionValue =
+    attributionParam && preview.suffix
+      ? extractParamValue(preview.suffix, attributionParam.key)
+      : null
 
   return (
     <div className="flex flex-col gap-5">
@@ -56,6 +67,9 @@ export function AdLinkPreview({
             {enabled.map((param) => (
               <ParamRow key={param.key} param={param} />
             ))}
+            {attributionParam && attributionValue && (
+              <AttributionRow attributionParam={attributionParam} value={attributionValue} />
+            )}
           </dl>
         </div>
       )}
@@ -109,6 +123,38 @@ function ParamRow({ param }: { param: AdParam }) {
           <Badge variant="outline" className="shrink-0 text-[0.625rem]">
             Dynamic
           </Badge>
+        )}
+      </dd>
+    </div>
+  )
+}
+
+/**
+ * The server-appended wt_link_id row — not one of the marketer's params, so it
+ * gets its own "Waytrace" badge rather than "Dynamic". When the value is still
+ * the not-yet-saved sentinel, it's styled distinctly so a preview can never be
+ * mistaken for a saved link's real bytes if it's screenshotted or copied.
+ */
+function AttributionRow({
+  attributionParam,
+  value,
+}: {
+  attributionParam: AttributionParamDto
+  value: string
+}) {
+  const pending = value === PREVIEW_LINK_ID
+  return (
+    <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1 p-3">
+      <dt className="w-40 shrink-0 font-mono text-xs text-muted-foreground">{attributionParam.key}</dt>
+      <dd className="flex min-w-0 flex-1 items-center gap-2">
+        <code className={`min-w-0 truncate font-mono text-xs ${pending ? 'italic text-muted-foreground' : ''}`}>
+          {value}
+        </code>
+        <Badge variant="outline" className="shrink-0 text-[0.625rem]">
+          Waytrace
+        </Badge>
+        {pending && (
+          <span className="text-xs text-muted-foreground">(assigned when you save)</span>
         )}
       </dd>
     </div>

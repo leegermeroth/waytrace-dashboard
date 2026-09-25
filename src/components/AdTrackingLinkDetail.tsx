@@ -4,6 +4,7 @@ import {
   getAdTrackingConfig,
   type AdPlatformDto,
   type AdTrackingConfig,
+  type AttributionParamDto,
   type DestinationHistoryEntry,
   type Link,
 } from '@/lib/api'
@@ -38,6 +39,7 @@ export function AdTrackingLinkDetail({
 }) {
   const [config, setConfig] = useState<AdTrackingConfig | null>(null)
   const [platform, setPlatform] = useState<AdPlatformDto | null>(null)
+  const [attributionParam, setAttributionParam] = useState<AttributionParamDto | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(true)
 
@@ -48,7 +50,8 @@ export function AdTrackingLinkDetail({
       .then(([cfg, registry]) => {
         if (cancelled) return
         setConfig(cfg)
-        setPlatform(registry.find((p) => p.id === cfg.platform) ?? null)
+        setPlatform(registry.platforms.find((p) => p.id === cfg.platform) ?? null)
+        setAttributionParam(registry.attribution_param)
       })
       .catch((err) => {
         if (!cancelled) setError(err instanceof Error ? err.message : 'Failed to load configuration')
@@ -150,6 +153,7 @@ export function AdTrackingLinkDetail({
                 full_url: config.full_url,
                 destination: config.destination_url,
               }}
+              attributionParam={attributionParam ?? undefined}
             />
           </CardContent>
         </Card>

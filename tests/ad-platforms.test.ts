@@ -3,6 +3,7 @@ import test from 'node:test'
 
 import {
   advancedCampaignTypes,
+  extractParamValue,
   findPlatform,
   isAdTrackingLink,
   isMacroAllowed,
@@ -153,4 +154,20 @@ test('isAdTrackingLink is not fooled by near-miss values', () => {
   for (const value of ['Ad_Tracking', 'AD_TRACKING', 'ad-tracking', 'ad_tracking ', 'xad_tracking']) {
     assert.equal(isAdTrackingLink({ link_type: value }), false, `${value} must not match`)
   }
+})
+
+// ── extractParamValue (AD_TRACKING_LINKS_GA4_PLAN.md §7) ────────────────────
+
+test('extractParamValue reads one key out of a generated parameter string', () => {
+  assert.equal(
+    extractParamValue('utm_source={{site_source_name}}&wt_link_id=42', 'wt_link_id'),
+    '42'
+  )
+  assert.equal(extractParamValue('wt_link_id=<assigned-on-save>', 'wt_link_id'), '<assigned-on-save>')
+  assert.equal(extractParamValue('utm_medium=paid_social', 'wt_link_id'), null, 'absent key is null')
+})
+
+test('extractParamValue does not partial-match a key name', () => {
+  // A key that is a prefix of another must not steal its value.
+  assert.equal(extractParamValue('wt_link_id_extra=1&wt_link_id=2', 'wt_link_id'), '2')
 })

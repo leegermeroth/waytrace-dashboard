@@ -88,3 +88,19 @@ export function macroLabel(platform: AdPlatformDto, macroId: string | undefined)
   if (!macroId) return ''
   return platform.macros.find((m) => m.id === macroId)?.label ?? macroId
 }
+
+/**
+ * Read one `key=value` pair out of an already-built `key=value&key=value`
+ * parameter string (AD_TRACKING_LINKS_GA4_PLAN.md §7). Used ONLY to display
+ * the server-appended wt_link_id attribution value — this is reading a value
+ * out of server output, not assembling one, so it does not conflict with "no
+ * dashboard code constructs an ad-tracking URL" (plan §9.2/§408).
+ */
+export function extractParamValue(suffix: string, key: string): string | null {
+  for (const pair of suffix.split('&')) {
+    const eq = pair.indexOf('=')
+    if (eq < 0) continue
+    if (pair.slice(0, eq) === key) return pair.slice(eq + 1)
+  }
+  return null
+}
