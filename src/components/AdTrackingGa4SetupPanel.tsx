@@ -11,7 +11,7 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Alert, AlertDescription } from '@/components/ui/alert'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Select, SelectContent, SelectItem, SelectTrigger } from '@/components/ui/select'
 
 /**
  * Ad tracking measurement setup (AD_TRACKING_LINKS_GA4_PLAN.md §6).
@@ -111,7 +111,14 @@ export function AdTrackingGa4SetupPanel({ clients }: { clients: Client[] }) {
         {clients.length > 1 && (
           <Select value={clientId ? String(clientId) : ''} onValueChange={(v) => setClientId(Number(v))}>
             <SelectTrigger className="sm:w-72">
-              <SelectValue placeholder="Select a workspace" />
+              {/* Base UI's SelectValue falls back to the raw value string by
+                  default, so without this it would show the workspace id
+                  instead of its name — same fix already applied elsewhere
+                  (AdTrackingLinkForm's workspace picker, Integrations' GA4
+                  property picker). */}
+              <span className="flex flex-1 text-left">
+                {clients.find((c) => c.id === clientId)?.name ?? 'Select a workspace'}
+              </span>
             </SelectTrigger>
             <SelectContent>
               {clients.map((c) => (
