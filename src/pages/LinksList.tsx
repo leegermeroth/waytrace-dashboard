@@ -359,9 +359,17 @@ export default function LinksList() {
           )}
         </div>
       ) : (
-        <div className="overflow-x-auto rounded-xl border border-border bg-card">
+        <div className="max-h-[calc(100vh-22rem)] overflow-auto rounded-xl border border-border bg-card [&>div]:overflow-visible">
           <Table className="[&_td]:py-2 [&_th]:h-9">
-            <TableHeader>
+            {/*
+              Sticky + a bounded scroll height keep the horizontal scrollbar
+              (and the column headers) always in view at the bottom/top of
+              THIS box, rather than at the true bottom of a potentially long
+              link list — the reachability problem reported when a long ad
+              tracking label widened the table enough to need horizontal
+              scroll in the first place.
+            */}
+            <TableHeader className="sticky top-0 z-10 bg-card">
               <TableRow>
                 <TableHead className="cursor-pointer" onClick={() => toggleSort('label')}>
                   Label
@@ -384,10 +392,11 @@ export default function LinksList() {
               {filtered.map((link) => (
                 <TableRow key={link.id}>
                   <TableCell>
-                    <div className="flex items-center gap-2">
+                    <div className="flex min-w-0 items-center gap-2">
                       <RouterLink
                         to={`/dashboard/links/${link.id}`}
-                        className="font-medium hover:text-ochre"
+                        title={link.label || link.short_code}
+                        className="min-w-0 max-w-[220px] truncate font-medium hover:text-ochre"
                       >
                         {link.label || link.short_code}
                       </RouterLink>
