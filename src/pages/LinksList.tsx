@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
-import { Link as RouterLink } from 'react-router-dom'
+import { Link as RouterLink, useSearchParams } from 'react-router-dom'
 import { Check, Copy, QrCode as QrIcon, Search, X } from 'lucide-react'
 import { deleteLink, listClients, listLinks, type Client, type Link } from '@/lib/api'
 import { Button } from '@/components/ui/button'
@@ -85,16 +85,40 @@ export default function LinksList() {
   const [error, setError] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(true)
 
-  const [search, setSearch] = useState('')
-  const [clientFilter, setClientFilter] = useState<string>('all')
-  const [sourceFilter, setSourceFilter] = useState<string>('all')
-  const [mediumFilter, setMediumFilter] = useState<string>('all')
-  const [campaignFilter, setCampaignFilter] = useState<string>('all')
-  const [contentFilter, setContentFilter] = useState<string>('all')
-  const [statusFilter, setStatusFilter] = useState<StatusFilter>('all')
+  // Filters and sort live in the URL, not component state (#41): clicking a
+  // link, then hitting Back, must land on the same filtered/sorted view
+  // instead of resetting — plain useState is gone on remount, but the URL
+  // survives navigation and browser history for free. `replace: true` means
+  // adjusting a filter never itself adds a Back-button stop; only leaving the
+  // page does.
+  const [searchParams, setSearchParams] = useSearchParams()
 
-  const [sortKey, setSortKey] = useState<SortKey>('created_at')
-  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc')
+  function updateParams(updates: Record<string, string | null>) {
+    const next = new URLSearchParams(searchParams)
+    for (const [key, value] of Object.entries(updates)) {
+      if (value === null) next.delete(key)
+      else next.set(key, value)
+    }
+    setSearchParams(next, { replace: true })
+  }
+
+  const search = searchParams.get('q') ?? ''
+  const clientFilter = searchParams.get('workspace') ?? 'all'
+  const sourceFilter = searchParams.get('source') ?? 'all'
+  const mediumFilter = searchParams.get('medium') ?? 'all'
+  const campaignFilter = searchParams.get('campaign') ?? 'all'
+  const contentFilter = searchParams.get('content') ?? 'all'
+  const statusFilter = (searchParams.get('status') as StatusFilter | null) ?? 'all'
+  const sortKey = (searchParams.get('sort') as SortKey | null) ?? 'created_at'
+  const sortDir = (searchParams.get('dir') as 'asc' | 'desc' | null) ?? 'desc'
+
+  const setSearch = (v: string) => updateParams({ q: v || null })
+  const setClientFilter = (v: string) => updateParams({ workspace: v === 'all' ? null : v })
+  const setSourceFilter = (v: string) => updateParams({ source: v === 'all' ? null : v })
+  const setMediumFilter = (v: string) => updateParams({ medium: v === 'all' ? null : v })
+  const setCampaignFilter = (v: string) => updateParams({ campaign: v === 'all' ? null : v })
+  const setContentFilter = (v: string) => updateParams({ content: v === 'all' ? null : v })
+  const setStatusFilter = (v: StatusFilter) => updateParams({ status: v === 'all' ? null : v })
 
   const [copiedKey, setCopiedKey] = useState<string | null>(null)
   const [qrUrl, setQrUrl] = useState<string | null>(null)
@@ -203,21 +227,22 @@ export default function LinksList() {
     statusFilter !== 'all'
 
   function clearFilters() {
-    setSearch('')
-    setClientFilter('all')
-    setSourceFilter('all')
-    setMediumFilter('all')
-    setCampaignFilter('all')
-    setContentFilter('all')
-    setStatusFilter('all')
+    updateParams({
+      q: null,
+      workspace: null,
+      source: null,
+      medium: null,
+      campaign: null,
+      content: null,
+      status: null,
+    })
   }
 
   function toggleSort(key: SortKey) {
     if (sortKey === key) {
-      setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'))
+      updateParams({ dir: sortDir === 'asc' ? 'desc' : 'asc' })
     } else {
-      setSortKey(key)
-      setSortDir('desc')
+      updateParams({ sort: key, dir: 'desc' })
     }
   }
 
@@ -319,13 +344,13 @@ export default function LinksList() {
         <div className="flex flex-wrap items-center gap-2">
           <FilterChip
             active={statusFilter === 'active'}
-            onClick={() => setStatusFilter((s) => (s === 'active' ? 'all' : 'active'))}
+            onClick={() => setStatusFilter(statusFilter === 'active' ? 'all' : 'active')}
           >
             Active
           </FilterChip>
           <FilterChip
             active={statusFilter === 'inactive'}
-            onClick={() => setStatusFilter((s) => (s === 'inactive' ? 'all' : 'inactive'))}
+            onClick={() => setStatusFilter(statusFilter === 'inactive' ? 'all' : 'inactive')}
           >
             Inactive
           </FilterChip>
